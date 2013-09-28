@@ -1,0 +1,29 @@
+{
+  "name": "react-core",
+  "version": "0.4.1",
+  "keywords": [
+    "react"
+  ],
+  "homepage": "http://facebook.github.io/react",
+  "bugs": "https://github.com/facebook/react/issues",
+  "licenses": [
+    {
+      "type": "Apache-2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0"
+    }
+  ],
+  "files": [
+    "modules/"
+  ],
+  "main": "modules/React.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/facebook/react"
+  },
+  "devDependencies": {
+    "react-tools": "0.4.1"
+  },
+  "engines": {
+    "node": ">=0.10.0"
+  }
+}
