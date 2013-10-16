@@ -71,19 +71,19 @@ var DOMPropertyInjection = {
     }
 
     for (var propName in Properties) {
-      invariant(
-        !DOMProperty.isStandardName[propName],
-        'injectDOMPropertyConfig(...): You\'re trying to inject DOM property ' +
-        '\'%s\' which has already been injected. You may be accidentally ' +
-        'injecting the same DOM property config twice, or you may be ' +
-        'injecting two configs that have conflicting property names.',
-        propName
-      );
+      invariant(!DOMProperty.isStandardName[propName]);
 
       DOMProperty.isStandardName[propName] = true;
 
-      DOMProperty.getAttributeName[propName] =
-        DOMAttributeNames[propName] || propName.toLowerCase();
+      var lowerCased = propName.toLowerCase();
+      DOMProperty.getPossibleStandardName[lowerCased] = propName;
+
+      var attributeName = DOMAttributeNames[propName];
+      if (attributeName) {
+        DOMProperty.getPossibleStandardName[attributeName] = propName;
+      }
+
+      DOMProperty.getAttributeName[propName] = attributeName || lowerCased;
 
       DOMProperty.getPropertyName[propName] =
         DOMPropertyNames[propName] || propName;
@@ -103,18 +103,10 @@ var DOMPropertyInjection = {
       DOMProperty.hasSideEffects[propName] =
         propConfig & DOMPropertyInjection.HAS_SIDE_EFFECTS;
 
-      invariant(
-        !DOMProperty.mustUseAttribute[propName] ||
-          !DOMProperty.mustUseProperty[propName],
-        'DOMProperty: Cannot use require using both attribute and property: %s',
-        propName
-      );
-      invariant(
-        DOMProperty.mustUseProperty[propName] ||
-          !DOMProperty.hasSideEffects[propName],
-        'DOMProperty: Properties that have side effects must use property: %s',
-        propName
-      );
+      invariant(!DOMProperty.mustUseAttribute[propName] ||
+        !DOMProperty.mustUseProperty[propName]);
+      invariant(DOMProperty.mustUseProperty[propName] ||
+        !DOMProperty.hasSideEffects[propName]);
     }
   }
 };
@@ -140,6 +132,13 @@ var DOMProperty = {
    * @type {Object}
    */
   isStandardName: {},
+
+  /**
+   * Mapping from lowercase property names to the properly cased version, used
+   * to warn in the case of missing properties.
+   * @type {Object}
+   */
+  getPossibleStandardName: {},
 
   /**
    * Mapping from normalized names to attribute names that differ. Attribute

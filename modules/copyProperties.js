@@ -24,31 +24,25 @@
  * we don't support unlimited arguments.
  */
 function copyProperties(obj, a, b, c, d, e, f) {
-  obj = obj || {};
+    obj = obj || {};
+    var args = [a, b, c, d, e];
+    var ii = 0, v;
 
-  if (true) {
-    if (f) {
-      throw new Error('Too many arguments passed to copyProperties');
+    while (args[ii]) {
+      v = args[ii++];
+      for (var k in v) {
+        obj[k] = v[k];
+      }
+
+      // IE ignores toString in object iteration.. See:
+      // webreflection.blogspot.com/2007/07/quick-fix-internet-explorer-and.html
+      if (v.hasOwnProperty && v.hasOwnProperty('toString') &&
+          (typeof v.toString != 'undefined') && (obj.toString !== v.toString)) {
+        obj.toString = v.toString;
+      }
     }
-  }
 
-  var args = [a, b, c, d, e];
-  var ii = 0, v;
-  while (args[ii]) {
-    v = args[ii++];
-    for (var k in v) {
-      obj[k] = v[k];
-    }
-
-    // IE ignores toString in object iteration.. See:
-    // webreflection.blogspot.com/2007/07/quick-fix-internet-explorer-and.html
-    if (v.hasOwnProperty && v.hasOwnProperty('toString') &&
-        (typeof v.toString != 'undefined') && (obj.toString !== v.toString)) {
-      obj.toString = v.toString;
-    }
-  }
-
-  return obj;
+    return obj;
 }
 
 module.exports = copyProperties;

@@ -46,7 +46,7 @@ var traverseAllChildrenImpl =
     if (Array.isArray(children)) {
       for (var i = 0; i < children.length; i++) {
         var child = children[i];
-        var nextName = nameSoFar + '[' + ReactComponent.getKey(child, i) + ']';
+        var nextName = nameSoFar + ReactComponent.getKey(child, i);
         var nextIndex = indexSoFar + subtreeCount;
         subtreeCount += traverseAllChildrenImpl(
           child,
@@ -62,7 +62,7 @@ var traverseAllChildrenImpl =
       // If it's the only child, treat the name as if it was wrapped in an array
       // so that it's consistent if the number of children grows
       var storageName = isOnlyChild ?
-        '[' + ReactComponent.getKey(children, 0) + ']' :
+        ReactComponent.getKey(children, 0):
         nameSoFar;
       if (children === null || children === undefined || type === 'boolean') {
         // All of the above are perceived as null.
@@ -73,11 +73,7 @@ var traverseAllChildrenImpl =
         subtreeCount = 1;
       } else {
         if (type === 'object') {
-          invariant(
-            children || children.nodeType !== 1,
-            'traverseAllChildren(...): Encountered an invalid child; DOM ' +
-            'elements are not valid children of React components.'
-          );
+          invariant(!children || children.nodeType !== 1);
           for (var key in children) {
             if (children.hasOwnProperty(key)) {
               subtreeCount += traverseAllChildrenImpl(

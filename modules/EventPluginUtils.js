@@ -17,11 +17,8 @@
  */
 
 "use strict";
-
 var EventConstants = require("./EventConstants");
-
 var invariant = require("./invariant");
-
 var topLevelTypes = EventConstants.topLevelTypes;
 
 function isEndish(topLevelType) {
@@ -34,30 +31,13 @@ function isMoveish(topLevelType) {
   return topLevelType === topLevelTypes.topMouseMove ||
          topLevelType === topLevelTypes.topTouchMove;
 }
+
 function isStartish(topLevelType) {
   return topLevelType === topLevelTypes.topMouseDown ||
          topLevelType === topLevelTypes.topTouchStart;
 }
 
 var validateEventDispatches;
-if (true) {
-  validateEventDispatches = function(event) {
-    var dispatchListeners = event._dispatchListeners;
-    var dispatchIDs = event._dispatchIDs;
-
-    var listenersIsArr = Array.isArray(dispatchListeners);
-    var idsIsArr = Array.isArray(dispatchIDs);
-    var IDsLen = idsIsArr ? dispatchIDs.length : dispatchIDs ? 1 : 0;
-    var listenersLen = listenersIsArr ?
-      dispatchListeners.length :
-      dispatchListeners ? 1 : 0;
-
-    invariant(
-      idsIsArr === listenersIsArr && IDsLen === listenersLen,
-      'EventPluginUtils: Invalid `event`.'
-    );
-  };
-}
 
 /**
  * Invokes `cb(event, listener, id)`. Avoids using call if no scope is
@@ -65,22 +45,20 @@ if (true) {
  * kept separate to conserve memory.
  */
 function forEachEventDispatch(event, cb) {
-  var dispatchListeners = event._dispatchListeners;
-  var dispatchIDs = event._dispatchIDs;
-  if (true) {
-    validateEventDispatches(event);
-  }
-  if (Array.isArray(dispatchListeners)) {
-    for (var i = 0; i < dispatchListeners.length; i++) {
-      if (event.isPropagationStopped()) {
-        break;
+    var dispatchListeners = event._dispatchListeners;
+    var dispatchIDs = event._dispatchIDs;
+
+    if (Array.isArray(dispatchListeners)) {
+      for (var i = 0; i < dispatchListeners.length; i++) {
+        if (event.isPropagationStopped()) {
+          break;
+        }
+        // Listeners and IDs are two parallel arrays that are always in sync.
+        cb(event, dispatchListeners[i], dispatchIDs[i]);
       }
-      // Listeners and IDs are two parallel arrays that are always in sync.
-      cb(event, dispatchListeners[i], dispatchIDs[i]);
+    } else if (dispatchListeners) {
+      cb(event, dispatchListeners, dispatchIDs);
     }
-  } else if (dispatchListeners) {
-    cb(event, dispatchListeners, dispatchIDs);
-  }
 }
 
 /**
@@ -110,27 +88,26 @@ function executeDispatchesInOrder(event, executeDispatch) {
  * null if no listener returned true.
  */
 function executeDispatchesInOrderStopAtTrue(event) {
-  var dispatchListeners = event._dispatchListeners;
-  var dispatchIDs = event._dispatchIDs;
-  if (true) {
-    validateEventDispatches(event);
-  }
-  if (Array.isArray(dispatchListeners)) {
-    for (var i = 0; i < dispatchListeners.length; i++) {
-      if (event.isPropagationStopped()) {
-        break;
+    var dispatchListeners = event._dispatchListeners;
+    var dispatchIDs = event._dispatchIDs;
+
+    if (Array.isArray(dispatchListeners)) {
+      for (var i = 0; i < dispatchListeners.length; i++) {
+        if (event.isPropagationStopped()) {
+          break;
+        }
+        // Listeners and IDs are two parallel arrays that are always in sync.
+        if (dispatchListeners[i](event, dispatchIDs[i])) {
+          return dispatchIDs[i];
+        }
       }
-      // Listeners and IDs are two parallel arrays that are always in sync.
-      if (dispatchListeners[i](event, dispatchIDs[i])) {
-        return dispatchIDs[i];
+    } else if (dispatchListeners) {
+      if (dispatchListeners(event, dispatchIDs)) {
+        return dispatchIDs;
       }
     }
-  } else if (dispatchListeners) {
-    if (dispatchListeners(event, dispatchIDs)) {
-      return dispatchIDs;
-    }
-  }
-  return null;
+
+    return null;
 }
 
 /**
@@ -143,21 +120,17 @@ function executeDispatchesInOrderStopAtTrue(event) {
  * @return The return value of executing the single dispatch.
  */
 function executeDirectDispatch(event) {
-  if (true) {
-    validateEventDispatches(event);
-  }
-  var dispatchListener = event._dispatchListeners;
-  var dispatchID = event._dispatchIDs;
-  invariant(
-    !Array.isArray(dispatchListener),
-    'executeDirectDispatch(...): Invalid `event`.'
-  );
-  var res = dispatchListener ?
-    dispatchListener(event, dispatchID) :
-    null;
-  event._dispatchListeners = null;
-  event._dispatchIDs = null;
-  return res;
+    var dispatchListener = event._dispatchListeners;
+    var dispatchID = event._dispatchIDs;
+    invariant(!Array.isArray(dispatchListener));
+
+    var res = dispatchListener ?
+      dispatchListener(event, dispatchID) :
+      null;
+
+    event._dispatchListeners = null;
+    event._dispatchIDs = null;
+    return res;
 }
 
 /**

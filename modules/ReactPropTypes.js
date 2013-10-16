@@ -42,7 +42,7 @@ var invariant = require("./invariant");
  *
  * A more formal specification of how these methods are used:
  *
- *   type := array|bool|object|number|string|oneOf([...])|instanceOf(...)
+ *   type := array|bool|func|object|number|string|oneOf([...])|instanceOf(...)
  *   decl := ReactPropTypes.{type}(.isRequired)?
  *
  * Each and every declaration produces a function with the same signature. This
@@ -56,7 +56,7 @@ var invariant = require("./invariant");
  *         var propValue = props[propName];
  *         invariant(
  *           propValue == null ||
- *           typeof propValue === string ||
+ *           typeof propValue === 'string' ||
  *           propValue instanceof URI,
  *           'Invalid `%s` supplied to `%s`, expected string or URI.',
  *           propName,
@@ -92,14 +92,7 @@ function createPrimitiveTypeChecker(expectedType) {
     if (propType === 'object' && Array.isArray(propValue)) {
       propType = 'array';
     }
-    invariant(
-      propType === expectedType,
-      'Invalid prop `%s` of type `%s` supplied to `%s`, expected `%s`.',
-      propName,
-      propType,
-      componentName,
-      expectedType
-    );
+    invariant(propType === expectedType);
   }
   return createChainableTypeChecker(validatePrimitiveType);
 }
@@ -107,26 +100,14 @@ function createPrimitiveTypeChecker(expectedType) {
 function createEnumTypeChecker(expectedValues) {
   var expectedEnum = createObjectFrom(expectedValues);
   function validateEnumType(propValue, propName, componentName) {
-    invariant(
-      expectedEnum[propValue],
-      'Invalid prop `%s` supplied to `%s`, expected one of %s.',
-      propName,
-      componentName,
-      JSON.stringify(Object.keys(expectedEnum))
-    );
+    invariant(expectedEnum[propValue]);
   }
   return createChainableTypeChecker(validateEnumType);
 }
 
 function createInstanceTypeChecker(expectedClass) {
   function validateInstanceType(propValue, propName, componentName) {
-    invariant(
-      propValue instanceof expectedClass,
-      'Invalid prop `%s` supplied to `%s`, expected instance of `%s`.',
-      propName,
-      componentName,
-      expectedClass.name || ANONYMOUS
-    );
+    invariant(propValue instanceof expectedClass);
   }
   return createChainableTypeChecker(validateInstanceType);
 }
@@ -139,12 +120,7 @@ function createChainableTypeChecker(validate) {
         // Only validate if there is a value to check.
         validate(propValue, propName, componentName || ANONYMOUS);
       } else {
-        invariant(
-          !isRequired,
-          'Required prop `%s` was not specified in `%s`.',
-          propName,
-          componentName || ANONYMOUS
-        );
+        invariant(!isRequired);
       }
     }
     if (!isRequired) {

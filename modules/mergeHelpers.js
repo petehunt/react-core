@@ -64,12 +64,7 @@ var mergeHelpers = {
    * @param {*} two Array to merge from.
    */
   checkMergeArrayArgs: function(one, two) {
-    invariant(
-      Array.isArray(one) && Array.isArray(two),
-      'Critical assumptions about the merge functions have been violated. ' +
-      'This is the fault of the merge functions themselves, not necessarily ' +
-      'the callers.'
-    );
+    invariant(Array.isArray(one) && Array.isArray(two));
   },
 
   /**
@@ -85,12 +80,7 @@ var mergeHelpers = {
    * @param {*} arg
    */
   checkMergeObjectArg: function(arg) {
-    invariant(
-      !isTerminal(arg) && !Array.isArray(arg),
-      'Critical assumptions about the merge functions have been violated. ' +
-      'This is the fault of the merge functions themselves, not necessarily ' +
-      'the callers.'
-    );
+    invariant(!isTerminal(arg) && !Array.isArray(arg));
   },
 
   /**
@@ -100,11 +90,7 @@ var mergeHelpers = {
    * @param {number} Level of recursion to validate against maximum.
    */
   checkMergeLevel: function(level) {
-    invariant(
-      level < MAX_MERGE_DEPTH,
-      'Maximum deep merge depth exceeded. You may be attempting to merge ' +
-      'circular structures in an unsupported way.'
-    );
+    invariant(level < MAX_MERGE_DEPTH);
   },
 
   /**
@@ -113,11 +99,7 @@ var mergeHelpers = {
    * @param {string} Array merge strategy.
    */
   checkArrayStrategy: function(strategy) {
-    invariant(
-      strategy === undefined || strategy in mergeHelpers.ArrayStrategies,
-      'You must provide an array strategy to deep merge functions to ' +
-      'instruct the deep merge how to resolve merging two arrays.'
-    );
+    invariant(strategy === undefined || strategy in mergeHelpers.ArrayStrategies);
   },
 
   /**

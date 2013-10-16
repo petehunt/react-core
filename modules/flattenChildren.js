@@ -29,12 +29,7 @@ var traverseAllChildren = require("./traverseAllChildren");
 function flattenSingleChildIntoContext(traverseContext, child, name) {
   // We found a component instance.
   var result = traverseContext;
-  invariant(
-    !result.hasOwnProperty(name),
-    'flattenChildren(...): Encountered two children with the same key, `%s`. ' +
-    'Children keys must be unique.',
-    name
-  );
+  invariant(!result.hasOwnProperty(name));
   result[name] = child;
 }
 

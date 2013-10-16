@@ -19,6 +19,7 @@
 "use strict";
 
 var emptyFunction = require("./emptyFunction");
+var invariant = require("./invariant");
 var joinClasses = require("./joinClasses");
 var merge = require("./merge");
 
@@ -90,6 +91,8 @@ var ReactPropTransferer = {
      * @protected
      */
     transferPropsTo: function(component) {
+      invariant(component.props.__owner__ === this);
+
       var props = {};
       for (var thatKey in component.props) {
         if (component.props.hasOwnProperty(thatKey)) {

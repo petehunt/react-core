@@ -110,19 +110,8 @@ function getParentID(id) {
  * @private
  */
 function getNextDescendantID(ancestorID, destinationID) {
-  invariant(
-    isValidID(ancestorID) && isValidID(destinationID),
-    'getNextDescendantID(%s, %s): Received an invalid React DOM ID.',
-    ancestorID,
-    destinationID
-  );
-  invariant(
-    isAncestorIDOf(ancestorID, destinationID),
-    'getNextDescendantID(...): React has made an invalid assumption about ' +
-    'the DOM hierarchy. Expected `%s` to be an ancestor of `%s`.',
-    ancestorID,
-    destinationID
-  );
+  invariant(isValidID(ancestorID) && isValidID(destinationID));
+  invariant(isAncestorIDOf(ancestorID, destinationID));
   if (ancestorID === destinationID) {
     return ancestorID;
   }
@@ -163,13 +152,7 @@ function getFirstCommonAncestorID(oneID, twoID) {
     }
   }
   var longestCommonID = oneID.substr(0, lastCommonMarkerIndex);
-  invariant(
-    isValidID(longestCommonID),
-    'getFirstCommonAncestorID(%s, %s): Expected a valid React DOM ID: %s',
-    oneID,
-    twoID,
-    longestCommonID
-  );
+  invariant(isValidID(longestCommonID));
   return longestCommonID;
 }
 
@@ -187,19 +170,9 @@ function getFirstCommonAncestorID(oneID, twoID) {
 function traverseParentPath(start, stop, cb, arg, skipFirst, skipLast) {
   start = start || '';
   stop = stop || '';
-  invariant(
-    start !== stop,
-    'traverseParentPath(...): Cannot traverse from and to the same ID, `%s`.',
-    start
-  );
+  invariant(start !== stop);
   var traverseUp = isAncestorIDOf(stop, start);
-  invariant(
-    traverseUp || isAncestorIDOf(start, stop),
-    'traverseParentPath(%s, %s, ...): Cannot traverse from two IDs that do ' +
-    'not have a parent path.',
-    start,
-    stop
-  );
+  invariant(traverseUp || isAncestorIDOf(start, stop));
   // Traverse from `start` to `stop` one depth at a time.
   var depth = 0;
   var traverse = traverseUp ? getParentID : getNextDescendantID;
@@ -211,12 +184,7 @@ function traverseParentPath(start, stop, cb, arg, skipFirst, skipLast) {
       // Only break //after// visiting `stop`.
       break;
     }
-    invariant(
-      depth++ < MAX_TREE_DEPTH,
-      'traverseParentPath(%s, %s, ...): Detected an infinite loop while ' +
-      'traversing the React DOM ID tree. This may be due to malformed IDs: %s',
-      start, stop
-    );
+    invariant(depth++ < MAX_TREE_DEPTH);
   }
 }
 
@@ -229,12 +197,22 @@ function traverseParentPath(start, stop, cb, arg, skipFirst, skipLast) {
  */
 var ReactInstanceHandles = {
 
-  separator: SEPARATOR,
-
   createReactRootID: function() {
     return getReactRootIDString(
       Math.ceil(Math.random() * GLOBAL_MOUNT_POINT_MAX)
     );
+  },
+
+  /**
+   * Constructs a React ID by joining a root ID with a name.
+   *
+   * @param {string} rootID Root ID of a parent component.
+   * @param {string} name A component's name (as flattened children).
+   * @return {string} A React ID.
+   * @internal
+   */
+  createReactID: function(rootID, name) {
+    return rootID + SEPARATOR + name;
   },
 
   /**

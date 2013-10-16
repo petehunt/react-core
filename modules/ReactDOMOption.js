@@ -21,7 +21,7 @@
 var ReactCompositeComponent = require("./ReactCompositeComponent");
 var ReactDOM = require("./ReactDOM");
 
-// Store a reference to the <option> `ReactNativeComponent`.
+// Store a reference to the <option> `ReactDOMComponent`.
 var option = ReactDOM.option;
 
 /**
@@ -31,14 +31,7 @@ var ReactDOMOption = ReactCompositeComponent.createClass({
 
   componentWillMount: function() {
     // TODO (yungsters): Remove support for `selected` in <option>.
-    if (this.props.selected != null) {
-      if (true) {
-        console.warn(
-          'Use the `defaultValue` or `value` props on <select> instead of ' +
-          'setting `selected` on <option>.'
-        );
-      }
-    }
+    if (this.props.selected != null) {}
   },
 
   render: function() {

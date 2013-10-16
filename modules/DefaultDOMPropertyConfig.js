@@ -16,6 +16,8 @@
  * @providesModule DefaultDOMPropertyConfig
  */
 
+/*jslint bitwise: true*/
+
 "use strict";
 
 var DOMProperty = require("./DOMProperty");
@@ -33,10 +35,9 @@ var DefaultDOMPropertyConfig = {
     /**
      * Standard Properties
      */
-    accessKey: null,
     accept: null,
+    accessKey: null,
     action: null,
-    ajaxify: MUST_USE_ATTRIBUTE,
     allowFullScreen: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE,
     allowTransparency: MUST_USE_ATTRIBUTE,
     alt: null,
@@ -45,9 +46,11 @@ var DefaultDOMPropertyConfig = {
     autoPlay: HAS_BOOLEAN_VALUE,
     cellPadding: null,
     cellSpacing: null,
+    charSet: MUST_USE_ATTRIBUTE,
     checked: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     className: MUST_USE_PROPERTY,
     colSpan: null,
+    content: null,
     contentEditable: null,
     contextMenu: MUST_USE_ATTRIBUTE,
     controls: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
@@ -57,11 +60,13 @@ var DefaultDOMPropertyConfig = {
     disabled: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     draggable: null,
     encType: null,
+    form: MUST_USE_ATTRIBUTE,
     frameBorder: MUST_USE_ATTRIBUTE,
     height: MUST_USE_ATTRIBUTE,
     hidden: MUST_USE_ATTRIBUTE | HAS_BOOLEAN_VALUE,
     href: null,
     htmlFor: null,
+    httpEquiv: null,
     icon: null,
     id: MUST_USE_PROPERTY,
     label: null,
@@ -74,14 +79,15 @@ var DefaultDOMPropertyConfig = {
     multiple: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
     name: null,
     pattern: null,
+    placeholder: null,
     poster: null,
     preload: null,
-    placeholder: null,
     radioGroup: null,
-    rel: null,
     readOnly: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
+    rel: null,
     required: HAS_BOOLEAN_VALUE,
     role: MUST_USE_ATTRIBUTE,
+    rowSpan: null,
     scrollLeft: MUST_USE_PROPERTY,
     scrollTop: MUST_USE_PROPERTY,
     selected: MUST_USE_PROPERTY | HAS_BOOLEAN_VALUE,
@@ -97,45 +103,58 @@ var DefaultDOMPropertyConfig = {
     value: MUST_USE_PROPERTY | HAS_SIDE_EFFECTS,
     width: MUST_USE_ATTRIBUTE,
     wmode: MUST_USE_ATTRIBUTE,
+
+    /**
+     * Non-standard Properties
+     */
+    autoCapitalize: null, // Supported in Mobile Safari for keyboard hints
+
     /**
      * SVG Properties
      */
-    cx: MUST_USE_PROPERTY,
-    cy: MUST_USE_PROPERTY,
-    d: MUST_USE_PROPERTY,
-    fill: MUST_USE_PROPERTY,
-    fx: MUST_USE_PROPERTY,
-    fy: MUST_USE_PROPERTY,
-    points: MUST_USE_PROPERTY,
-    r: MUST_USE_PROPERTY,
-    stroke: MUST_USE_PROPERTY,
-    strokeLinecap: MUST_USE_PROPERTY,
-    strokeWidth: MUST_USE_PROPERTY,
-    transform: MUST_USE_PROPERTY,
-    x: MUST_USE_PROPERTY,
-    x1: MUST_USE_PROPERTY,
-    x2: MUST_USE_PROPERTY,
-    version: MUST_USE_PROPERTY,
-    viewBox: MUST_USE_PROPERTY,
-    y: MUST_USE_PROPERTY,
-    y1: MUST_USE_PROPERTY,
-    y2: MUST_USE_PROPERTY,
-    spreadMethod: MUST_USE_PROPERTY,
-    offset: MUST_USE_PROPERTY,
-    stopColor: MUST_USE_PROPERTY,
-    stopOpacity: MUST_USE_PROPERTY,
-    gradientUnits: MUST_USE_PROPERTY,
-    gradientTransform: MUST_USE_PROPERTY
+    cx: MUST_USE_ATTRIBUTE,
+    cy: MUST_USE_ATTRIBUTE,
+    d: MUST_USE_ATTRIBUTE,
+    fill: MUST_USE_ATTRIBUTE,
+    fx: MUST_USE_ATTRIBUTE,
+    fy: MUST_USE_ATTRIBUTE,
+    gradientTransform: MUST_USE_ATTRIBUTE,
+    gradientUnits: MUST_USE_ATTRIBUTE,
+    offset: MUST_USE_ATTRIBUTE,
+    points: MUST_USE_ATTRIBUTE,
+    r: MUST_USE_ATTRIBUTE,
+    rx: MUST_USE_ATTRIBUTE,
+    ry: MUST_USE_ATTRIBUTE,
+    spreadMethod: MUST_USE_ATTRIBUTE,
+    stopColor: MUST_USE_ATTRIBUTE,
+    stopOpacity: MUST_USE_ATTRIBUTE,
+    stroke: MUST_USE_ATTRIBUTE,
+    strokeLinecap: MUST_USE_ATTRIBUTE,
+    strokeWidth: MUST_USE_ATTRIBUTE,
+    transform: MUST_USE_ATTRIBUTE,
+    version: MUST_USE_ATTRIBUTE,
+    viewBox: MUST_USE_ATTRIBUTE,
+    x1: MUST_USE_ATTRIBUTE,
+    x2: MUST_USE_ATTRIBUTE,
+    x: MUST_USE_ATTRIBUTE,
+    y1: MUST_USE_ATTRIBUTE,
+    y2: MUST_USE_ATTRIBUTE,
+    y: MUST_USE_ATTRIBUTE
   },
   DOMAttributeNames: {
     className: 'class',
+    gradientTransform: 'gradientTransform',
+    gradientUnits: 'gradientUnits',
     htmlFor: 'for',
+    spreadMethod: 'spreadMethod',
+    stopColor: 'stop-color',
+    stopOpacity: 'stop-opacity',
     strokeLinecap: 'stroke-linecap',
     strokeWidth: 'stroke-width',
-    stopColor: 'stop-color',
-    stopOpacity: 'stop-opacity'
+    viewBox: 'viewBox'
   },
   DOMPropertyNames: {
+    autoCapitalize: 'autocapitalize',
     autoComplete: 'autocomplete',
     autoFocus: 'autofocus',
     autoPlay: 'autoplay',

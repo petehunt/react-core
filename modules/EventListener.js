@@ -44,14 +44,7 @@ var EventListener = {
    */
   capture: function(el, handlerBaseName, cb) {
     if (!el.addEventListener) {
-      if (true) {
-        console.error(
-          'You are attempting to use addEventlistener ' +
-          'in a browser that does not support it support it.' +
-          'This likely means that you will not receive events that ' +
-          'your application relies on (such as scroll).');
-      }
-      return;
+        return;
     } else {
       el.addEventListener(handlerBaseName, cb, true);
     }

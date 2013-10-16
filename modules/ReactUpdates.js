@@ -20,51 +20,70 @@
 
 var invariant = require("./invariant");
 
-var isBatchingUpdates = false;
-
 var dirtyComponents = [];
 
+var batchingStrategy = null;
+
+function ensureBatchingStrategy() {
+  invariant(batchingStrategy);
+}
+
+function batchedUpdates(callback, param) {
+  ensureBatchingStrategy();
+  batchingStrategy.batchedUpdates(callback, param);
+}
+
 /**
- * Call the provided function in a context within which calls to `setState` and
- * friends are batched such that components aren't updated unnecessarily.
+ * Array comparator for ReactComponents by owner depth
+ *
+ * @param {ReactComponent} c1 first component you're comparing
+ * @param {ReactComponent} c2 second component you're comparing
+ * @return {number} Return value usable by Array.prototype.sort().
  */
-function batchedUpdates(callback) {
-  if (isBatchingUpdates) {
-    // We're already executing in an environment where updates will be batched,
-    // so this is a no-op.
-    callback();
-    return;
-  }
+function mountDepthComparator(c1, c2) {
+  return c1._mountDepth - c2._mountDepth;
+}
 
-  isBatchingUpdates = true;
+function runBatchedUpdates() {
+  // Since reconciling a component higher in the owner hierarchy usually (not
+  // always -- see shouldComponentUpdate()) will reconcile children, reconcile
+  // them before their children by sorting the array.
 
-  try {
-    callback();
-    // TODO: Sort components by depth such that parent components update first
-    for (var i = 0; i < dirtyComponents.length; i++) {
-      // If a component is unmounted before pending changes apply, ignore them
-      // TODO: Queue unmounts in the same list to avoid this happening at all
-      var component = dirtyComponents[i];
-      if (component.isMounted()) {
-        // If performUpdateIfNecessary happens to enqueue any new updates, we
-        // shouldn't execute the callbacks until the next render happens, so
-        // stash the callbacks first
-        var callbacks = component._pendingCallbacks;
-        component._pendingCallbacks = null;
-        component.performUpdateIfNecessary();
-        if (callbacks) {
-          for (var j = 0; j < callbacks.length; j++) {
-            callbacks[j].call(component);
-          }
+  dirtyComponents.sort(mountDepthComparator);
+
+  for (var i = 0; i < dirtyComponents.length; i++) {
+    // If a component is unmounted before pending changes apply, ignore them
+    // TODO: Queue unmounts in the same list to avoid this happening at all
+    var component = dirtyComponents[i];
+    if (component.isMounted()) {
+      // If performUpdateIfNecessary happens to enqueue any new updates, we
+      // shouldn't execute the callbacks until the next render happens, so
+      // stash the callbacks first
+      var callbacks = component._pendingCallbacks;
+      component._pendingCallbacks = null;
+      component.performUpdateIfNecessary();
+      if (callbacks) {
+        for (var j = 0; j < callbacks.length; j++) {
+          callbacks[j].call(component);
         }
       }
     }
-  } catch (error) {
-    // IE8 requires `catch` in order to use `finally`.
-    throw error;
+  }
+}
+
+function clearDirtyComponents() {
+  dirtyComponents.length = 0;
+}
+
+function flushBatchedUpdates() {
+  // Run these in separate functions so the JIT can optimize
+  try {
+    runBatchedUpdates();
+  } catch (e) {
+    // IE 8 requires catch to use finally.
+    throw e;
   } finally {
-    dirtyComponents.length = 0;
-    isBatchingUpdates = false;
+    clearDirtyComponents();
   }
 }
 
@@ -73,14 +92,10 @@ function batchedUpdates(callback) {
  * list of functions which will be executed once the rerender occurs.
  */
 function enqueueUpdate(component, callback) {
-  invariant(
-    !callback || typeof callback === "function",
-    'enqueueUpdate(...): You called `setProps`, `replaceProps`, ' +
-    '`setState`, `replaceState`, or `forceUpdate` with a callback that ' +
-    'isn\'t callable.'
-  );
+  invariant(!callback || typeof callback === "function");
+  ensureBatchingStrategy();
 
-  if (!isBatchingUpdates) {
+  if (!batchingStrategy.isBatchingUpdates) {
     component.performUpdateIfNecessary();
     callback && callback();
     return;
@@ -97,9 +112,20 @@ function enqueueUpdate(component, callback) {
   }
 }
 
+var ReactUpdatesInjection = {
+  injectBatchingStrategy: function(_batchingStrategy) {
+    invariant(_batchingStrategy);
+    invariant(typeof _batchingStrategy.batchedUpdates === 'function');
+    invariant(typeof _batchingStrategy.isBatchingUpdates === 'boolean');
+    batchingStrategy = _batchingStrategy;
+  }
+};
+
 var ReactUpdates = {
   batchedUpdates: batchedUpdates,
-  enqueueUpdate: enqueueUpdate
+  enqueueUpdate: enqueueUpdate,
+  flushBatchedUpdates: flushBatchedUpdates,
+  injection: ReactUpdatesInjection
 };
 
 module.exports = ReactUpdates;

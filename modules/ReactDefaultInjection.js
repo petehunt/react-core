@@ -19,6 +19,7 @@
 "use strict";
 
 var ReactDOM = require("./ReactDOM");
+var ReactDOMButton = require("./ReactDOMButton");
 var ReactDOMForm = require("./ReactDOMForm");
 var ReactDOMInput = require("./ReactDOMInput");
 var ReactDOMOption = require("./ReactDOMOption");
@@ -26,46 +27,61 @@ var ReactDOMSelect = require("./ReactDOMSelect");
 var ReactDOMTextarea = require("./ReactDOMTextarea");
 var ReactEventEmitter = require("./ReactEventEmitter");
 var ReactEventTopLevelCallback = require("./ReactEventTopLevelCallback");
+var ReactPerf = require("./ReactPerf");
 
 var DefaultDOMPropertyConfig = require("./DefaultDOMPropertyConfig");
 var DOMProperty = require("./DOMProperty");
 
+var ChangeEventPlugin = require("./ChangeEventPlugin");
+var CompositionEventPlugin = require("./CompositionEventPlugin");
 var DefaultEventPluginOrder = require("./DefaultEventPluginOrder");
 var EnterLeaveEventPlugin = require("./EnterLeaveEventPlugin");
-var ChangeEventPlugin = require("./ChangeEventPlugin");
 var EventPluginHub = require("./EventPluginHub");
-var ReactInstanceHandles = require("./ReactInstanceHandles");
-var SimpleEventPlugin = require("./SimpleEventPlugin");
 var MobileSafariClickEventPlugin = require("./MobileSafariClickEventPlugin");
+var ReactInstanceHandles = require("./ReactInstanceHandles");
+var SelectEventPlugin = require("./SelectEventPlugin");
+var SimpleEventPlugin = require("./SimpleEventPlugin");
+
+var ReactDefaultBatchingStrategy = require("./ReactDefaultBatchingStrategy");
+var ReactUpdates = require("./ReactUpdates");
 
 function inject() {
-  ReactEventEmitter.TopLevelCallbackCreator = ReactEventTopLevelCallback;
-  /**
-   * Inject module for resolving DOM hierarchy and plugin ordering.
-   */
-  EventPluginHub.injection.injectEventPluginOrder(DefaultEventPluginOrder);
-  EventPluginHub.injection.injectInstanceHandle(ReactInstanceHandles);
+    ReactEventEmitter.TopLevelCallbackCreator = ReactEventTopLevelCallback;
 
-  /**
-   * Some important event plugins included by default (without having to require
-   * them).
-   */
-  EventPluginHub.injection.injectEventPluginsByName({
-    'SimpleEventPlugin': SimpleEventPlugin,
-    'EnterLeaveEventPlugin': EnterLeaveEventPlugin,
-    'ChangeEventPlugin': ChangeEventPlugin,
-    'MobileSafariClickEventPlugin': MobileSafariClickEventPlugin
-  });
+    /**
+     * Inject module for resolving DOM hierarchy and plugin ordering.
+     */
+    EventPluginHub.injection.injectEventPluginOrder(DefaultEventPluginOrder);
 
-  ReactDOM.injection.injectComponentClasses({
-    form: ReactDOMForm,
-    input: ReactDOMInput,
-    option: ReactDOMOption,
-    select: ReactDOMSelect,
-    textarea: ReactDOMTextarea
-  });
+    EventPluginHub.injection.injectInstanceHandle(ReactInstanceHandles);
 
-  DOMProperty.injection.injectDOMPropertyConfig(DefaultDOMPropertyConfig);
+    /**
+     * Some important event plugins included by default (without having to require
+     * them).
+     */
+    EventPluginHub.injection.injectEventPluginsByName({
+      SimpleEventPlugin: SimpleEventPlugin,
+      EnterLeaveEventPlugin: EnterLeaveEventPlugin,
+      ChangeEventPlugin: ChangeEventPlugin,
+      CompositionEventPlugin: CompositionEventPlugin,
+      MobileSafariClickEventPlugin: MobileSafariClickEventPlugin,
+      SelectEventPlugin: SelectEventPlugin
+    });
+
+    ReactDOM.injection.injectComponentClasses({
+      button: ReactDOMButton,
+      form: ReactDOMForm,
+      input: ReactDOMInput,
+      option: ReactDOMOption,
+      select: ReactDOMSelect,
+      textarea: ReactDOMTextarea
+    });
+
+    DOMProperty.injection.injectDOMPropertyConfig(DefaultDOMPropertyConfig);
+
+    ReactUpdates.injection.injectBatchingStrategy(
+      ReactDefaultBatchingStrategy
+    );
 }
 
 module.exports = {

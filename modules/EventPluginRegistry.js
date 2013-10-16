@@ -44,30 +44,15 @@ function recomputePluginOrdering() {
   for (var pluginName in namesToPlugins) {
     var PluginModule = namesToPlugins[pluginName];
     var pluginIndex = EventPluginOrder.indexOf(pluginName);
-    invariant(
-      pluginIndex > -1,
-      'EventPluginRegistry: Cannot inject event plugins that do not exist in ' +
-      'the plugin ordering, `%s`.',
-      pluginName
-    );
+    invariant(pluginIndex > -1);
     if (EventPluginRegistry.plugins[pluginIndex]) {
       continue;
     }
-    invariant(
-      PluginModule.extractEvents,
-      'EventPluginRegistry: Event plugins must implement an `extractEvents` ' +
-      'method, but `%s` does not.',
-      pluginName
-    );
+    invariant(PluginModule.extractEvents);
     EventPluginRegistry.plugins[pluginIndex] = PluginModule;
     var publishedEvents = PluginModule.eventTypes;
     for (var eventName in publishedEvents) {
-      invariant(
-        publishEventForPlugin(publishedEvents[eventName], PluginModule),
-        'EventPluginRegistry: Failed to publish event `%s` for plugin `%s`.',
-        eventName,
-        pluginName
-      );
+      invariant(publishEventForPlugin(publishedEvents[eventName], PluginModule));
     }
   }
 }
@@ -106,12 +91,7 @@ function publishEventForPlugin(dispatchConfig, PluginModule) {
  * @private
  */
 function publishRegistrationName(registrationName, PluginModule) {
-  invariant(
-    !EventPluginRegistry.registrationNames[registrationName],
-    'EventPluginHub: More than one plugin attempted to publish the same ' +
-    'registration name, `%s`.',
-    registrationName
-  );
+  invariant(!EventPluginRegistry.registrationNames[registrationName]);
   EventPluginRegistry.registrationNames[registrationName] = PluginModule;
   EventPluginRegistry.registrationNamesKeys.push(registrationName);
 }
@@ -148,10 +128,7 @@ var EventPluginRegistry = {
    * @see {EventPluginHub.injection.injectEventPluginOrder}
    */
   injectEventPluginOrder: function(InjectedEventPluginOrder) {
-    invariant(
-      !EventPluginOrder,
-      'EventPluginRegistry: Cannot inject event plugin ordering more than once.'
-    );
+    invariant(!EventPluginOrder);
     // Clone the ordering so it cannot be dynamically mutated.
     EventPluginOrder = Array.prototype.slice.call(InjectedEventPluginOrder);
     recomputePluginOrdering();
@@ -175,12 +152,7 @@ var EventPluginRegistry = {
       }
       var PluginModule = injectedNamesToPlugins[pluginName];
       if (namesToPlugins[pluginName] !== PluginModule) {
-        invariant(
-          !namesToPlugins[pluginName],
-          'EventPluginRegistry: Cannot inject two different event plugins ' +
-          'using the same name, `%s`.',
-          pluginName
-        );
+        invariant(!namesToPlugins[pluginName]);
         namesToPlugins[pluginName] = PluginModule;
         isOrderingDirty = true;
       }

@@ -19,17 +19,15 @@
 "use strict";
 
 var DOMPropertyOperations = require("./DOMPropertyOperations");
+var LinkedValueMixin = require("./LinkedValueMixin");
 var ReactCompositeComponent = require("./ReactCompositeComponent");
 var ReactDOM = require("./ReactDOM");
 
 var invariant = require("./invariant");
 var merge = require("./merge");
 
-// Store a reference to the <textarea> `ReactNativeComponent`.
+// Store a reference to the <textarea> `ReactDOMComponent`.
 var textarea = ReactDOM.textarea;
-
-// For quickly matching children type, to test if can be treated as content.
-var CONTENT_TYPES = {'string': true, 'number': true};
 
 /**
  * Implements a <textarea> native component that allows setting `value`, and
@@ -47,41 +45,32 @@ var CONTENT_TYPES = {'string': true, 'number': true};
  * `defaultValue` if specified, or the children content (deprecated).
  */
 var ReactDOMTextarea = ReactCompositeComponent.createClass({
+  mixins: [LinkedValueMixin],
 
   getInitialState: function() {
     var defaultValue = this.props.defaultValue;
     // TODO (yungsters): Remove support for children content in <textarea>.
     var children = this.props.children;
     if (children != null) {
-      if (true) {
-        console.warn(
-          'Use the `defaultValue` or `value` props instead of setting ' +
-          'children on <textarea>.'
-        );
-      }
-      invariant(
-        defaultValue == null,
-        'If you supply `defaultValue` on a <textarea>, do not pass children.'
-      );
-      if (Array.isArray(children)) {
-        invariant(
-          children.length <= 1,
-          '<textarea> can only have at most one child.'
-        );
-        children = children[0];
-      }
-      invariant(
-        CONTENT_TYPES[typeof children],
-        'If you specify children to <textarea>, it must be a single string ' +
-        'or number., not an array or object.'
-      );
-      defaultValue = '' + children;
+        invariant(defaultValue == null);
+
+        if (Array.isArray(children)) {
+          invariant(children.length <= 1);
+          children = children[0];
+        }
+
+        defaultValue = '' + children;
     }
-    defaultValue = defaultValue || '';
+    if (defaultValue == null) {
+      defaultValue = '';
+    }
+    var value = this.getValue();
     return {
-      // We save the initial value so that `ReactNativeComponent` doesn't update
+      // We save the initial value so that `ReactDOMComponent` doesn't update
       // `textContent` (unnecessary since we update value).
-      initialValue: this.props.value != null ? this.props.value : defaultValue,
+      // The initial value can be a boolean or object so that's why it's
+      // forced to be a string.
+      initialValue: '' + (value != null ? value : defaultValue),
       value: defaultValue
     };
   },
@@ -91,21 +80,16 @@ var ReactDOMTextarea = ReactCompositeComponent.createClass({
     return !this._isChanging;
   },
 
-  getValue: function() {
-    return this.props.value != null ? this.props.value : this.state.value;
-  },
-
   render: function() {
     // Clone `this.props` so we don't mutate the input.
     var props = merge(this.props);
+    var value = this.getValue();
 
-    invariant(
-      props.dangerouslySetInnerHTML == null,
-      '`dangerouslySetInnerHTML` does not make sense on <textarea>.'
-    );
+    invariant(props.dangerouslySetInnerHTML == null);
 
-    props.value = this.getValue();
-    props.onChange = this.handleChange;
+    props.defaultValue = null;
+    props.value = value != null ? value : this.state.value;
+    props.onChange = this._handleChange;
 
     // Always set children to the same thing. In IE9, the selection range will
     // get reset if `textContent` is mutated.
@@ -113,20 +97,20 @@ var ReactDOMTextarea = ReactCompositeComponent.createClass({
   },
 
   componentDidUpdate: function(prevProps, prevState, rootNode) {
-    if (this.props.value != null) {
-      DOMPropertyOperations.setValueForProperty(
-        rootNode,
-        'value',
-        this.props.value || ''
-      );
+    var value = this.getValue();
+    if (value != null) {
+      // Cast `value` to a string to ensure the value is set correctly. While
+      // browsers typically do this as necessary, jsdom doesn't.
+      DOMPropertyOperations.setValueForProperty(rootNode, 'value', '' + value);
     }
   },
 
-  handleChange: function(event) {
+  _handleChange: function(event) {
     var returnValue;
-    if (this.props.onChange) {
+    var onChange = this.getOnChange();
+    if (onChange) {
       this._isChanging = true;
-      returnValue = this.props.onChange(event);
+      returnValue = onChange(event);
       this._isChanging = false;
     }
     this.setState({value: event.target.value});

@@ -21,6 +21,7 @@
 var ReactComponent = require("./ReactComponent");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
 var ReactOwner = require("./ReactOwner");
+var ReactPerf = require("./ReactPerf");
 var ReactPropTransferer = require("./ReactPropTransferer");
 var ReactUpdates = require("./ReactUpdates");
 
@@ -28,6 +29,7 @@ var invariant = require("./invariant");
 var keyMirror = require("./keyMirror");
 var merge = require("./merge");
 var mixInto = require("./mixInto");
+var objMap = require("./objMap");
 
 /**
  * Policies that describe methods in `ReactCompositeComponentInterface`.
@@ -45,7 +47,13 @@ var SpecPolicy = keyMirror({
   /**
    * These methods are overriding the base ReactCompositeComponent class.
    */
-  OVERRIDE_BASE: null
+  OVERRIDE_BASE: null,
+  /**
+   * These methods are similar to DEFINE_MANY, except we assume they return
+   * objects. We try to merge the keys of the return values of all the mixed in
+   * functions. If there is a key conflict we throw.
+   */
+  DEFINE_MANY_MERGED: null
 });
 
 /**
@@ -102,7 +110,7 @@ var ReactCompositeComponentInterface = {
    * @return {object}
    * @optional
    */
-  getDefaultProps: SpecPolicy.DEFINE_ONCE,
+  getDefaultProps: SpecPolicy.DEFINE_MANY_MERGED,
 
   /**
    * Invoked once before the component is mounted. The return value will be used
@@ -118,7 +126,7 @@ var ReactCompositeComponentInterface = {
    * @return {object}
    * @optional
    */
-  getInitialState: SpecPolicy.DEFINE_ONCE,
+  getInitialState: SpecPolicy.DEFINE_MANY_MERGED,
 
   /**
    * Uses props from `this.props` and state from `this.state` to render the
@@ -288,41 +296,23 @@ function validateMethodOverride(proto, name) {
 
   // Disallow overriding of base class methods unless explicitly allowed.
   if (ReactCompositeComponentMixin.hasOwnProperty(name)) {
-    invariant(
-      specPolicy === SpecPolicy.OVERRIDE_BASE,
-      'ReactCompositeComponentInterface: You are attempting to override ' +
-      '`%s` from your class specification. Ensure that your method names ' +
-      'do not overlap with React methods.',
-      name
-    );
+    invariant(specPolicy === SpecPolicy.OVERRIDE_BASE);
   }
 
   // Disallow defining methods more than once unless explicitly allowed.
   if (proto.hasOwnProperty(name)) {
-    invariant(
-      specPolicy === SpecPolicy.DEFINE_MANY,
-      'ReactCompositeComponentInterface: You are attempting to define ' +
-      '`%s` on your component more than once. This conflict may be due ' +
-      'to a mixin.',
-      name
-    );
+    invariant(specPolicy === SpecPolicy.DEFINE_MANY ||
+    specPolicy === SpecPolicy.DEFINE_MANY_MERGED);
   }
 }
 
 
 function validateLifeCycleOnReplaceState(instance) {
   var compositeLifeCycleState = instance._compositeLifeCycleState;
-  invariant(
-    instance.isMounted() ||
-      compositeLifeCycleState === CompositeLifeCycle.MOUNTING,
-    'replaceState(...): Can only update a mounted or mounting component.'
-  );
-  invariant(
-    compositeLifeCycleState !== CompositeLifeCycle.RECEIVING_STATE &&
-    compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING,
-    'replaceState(...): Cannot update while unmounting component or during ' +
-    'an existing state transition (such as within `render`).'
-  );
+  invariant(instance.isMounted() ||
+    compositeLifeCycleState === CompositeLifeCycle.MOUNTING);
+  invariant(compositeLifeCycleState !== CompositeLifeCycle.RECEIVING_STATE &&
+  compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING);
 }
 
 /**
@@ -365,13 +355,52 @@ function mixSpecIntoComponent(Constructor, spec) {
         if (isInherited) {
           // For methods which are defined more than once, call the existing
           // methods before calling the new property.
-          proto[name] = createChainedFunction(proto[name], property);
+          if (ReactCompositeComponentInterface[name] ===
+              SpecPolicy.DEFINE_MANY_MERGED) {
+            proto[name] = createMergedResultFunction(proto[name], property);
+          } else {
+            proto[name] = createChainedFunction(proto[name], property);
+          }
         } else {
           proto[name] = property;
         }
       }
     }
   }
+}
+
+/**
+ * Merge two objects, but throw if both contain the same key.
+ *
+ * @param {object} one The first object, which is mutated.
+ * @param {object} two The second object
+ * @return {object} one after it has been mutated to contain everything in two.
+ */
+function mergeObjectsWithNoDuplicateKeys(one, two) {
+  invariant(one && two && typeof one === 'object' && typeof two === 'object');
+
+  objMap(two, function(value, key) {
+    invariant(one[key] === undefined);
+    one[key] = value;
+  });
+  return one;
+}
+
+/**
+ * Creates a function that invokes two functions and merges their return values.
+ *
+ * @param {function} one Function to invoke first.
+ * @param {function} two Function to invoke second.
+ * @return {function} Function that invokes the two argument functions.
+ * @private
+ */
+function createMergedResultFunction(one, two) {
+  return function mergedResult() {
+    return mergeObjectsWithNoDuplicateKeys(
+      one.apply(this, arguments),
+      two.apply(this, arguments)
+    );
+  };
 }
 
 /**
@@ -475,45 +504,59 @@ var ReactCompositeComponentMixin = {
    *
    * @param {string} rootID DOM ID of the root node.
    * @param {ReactReconcileTransaction} transaction
+   * @param {number} mountDepth number of components in the owner hierarchy
    * @return {?string} Rendered markup to be inserted into the DOM.
    * @final
    * @internal
    */
-  mountComponent: function(rootID, transaction) {
-    ReactComponent.Mixin.mountComponent.call(this, rootID, transaction);
-    this._compositeLifeCycleState = CompositeLifeCycle.MOUNTING;
+  mountComponent: ReactPerf.measure(
+    'ReactCompositeComponent',
+    'mountComponent',
+    function(rootID, transaction, mountDepth) {
+      ReactComponent.Mixin.mountComponent.call(
+        this,
+        rootID,
+        transaction,
+        mountDepth
+      );
+      this._compositeLifeCycleState = CompositeLifeCycle.MOUNTING;
 
-    this._defaultProps = this.getDefaultProps ? this.getDefaultProps() : null;
-    this._processProps(this.props);
+      this._defaultProps = this.getDefaultProps ? this.getDefaultProps() : null;
+      this._processProps(this.props);
 
-    if (this.__reactAutoBindMap) {
-      this._bindAutoBindMethods();
-    }
-
-    this.state = this.getInitialState ? this.getInitialState() : null;
-    this._pendingState = null;
-    this._pendingForceUpdate = false;
-
-    if (this.componentWillMount) {
-      this.componentWillMount();
-      // When mounting, calls to `setState` by `componentWillMount` will set
-      // `this._pendingState` without triggering a re-render.
-      if (this._pendingState) {
-        this.state = this._pendingState;
-        this._pendingState = null;
+      if (this.__reactAutoBindMap) {
+        this._bindAutoBindMethods();
       }
-    }
 
-    this._renderedComponent = this._renderValidatedComponent();
+      this.state = this.getInitialState ? this.getInitialState() : null;
+      this._pendingState = null;
+      this._pendingForceUpdate = false;
 
-    // Done with mounting, `setState` will now trigger UI changes.
-    this._compositeLifeCycleState = null;
-    var markup = this._renderedComponent.mountComponent(rootID, transaction);
-    if (this.componentDidMount) {
-      transaction.getReactOnDOMReady().enqueue(this, this.componentDidMount);
+      if (this.componentWillMount) {
+        this.componentWillMount();
+        // When mounting, calls to `setState` by `componentWillMount` will set
+        // `this._pendingState` without triggering a re-render.
+        if (this._pendingState) {
+          this.state = this._pendingState;
+          this._pendingState = null;
+        }
+      }
+
+      this._renderedComponent = this._renderValidatedComponent();
+
+      // Done with mounting, `setState` will now trigger UI changes.
+      this._compositeLifeCycleState = null;
+      var markup = this._renderedComponent.mountComponent(
+        rootID,
+        transaction,
+        mountDepth + 1
+      );
+      if (this.componentDidMount) {
+        transaction.getReactMountReady().enqueue(this, this.componentDidMount);
+      }
+      return markup;
     }
-    return markup;
-  },
+  ),
 
   /**
    * Releases any resources allocated by `mountComponent`.
@@ -695,7 +738,7 @@ var ReactCompositeComponentMixin = {
     this.updateComponent(transaction, prevProps, prevState);
 
     if (this.componentDidUpdate) {
-      transaction.getReactOnDOMReady().enqueue(
+      transaction.getReactMountReady().enqueue(
         this,
         this.componentDidUpdate.bind(this, prevProps, prevState)
       );
@@ -714,25 +757,33 @@ var ReactCompositeComponentMixin = {
    * @internal
    * @overridable
    */
-  updateComponent: function(transaction, prevProps, prevState) {
-    ReactComponent.Mixin.updateComponent.call(this, transaction, prevProps);
-    var currentComponent = this._renderedComponent;
-    var nextComponent = this._renderValidatedComponent();
-    if (currentComponent.constructor === nextComponent.constructor) {
-      currentComponent.receiveProps(nextComponent.props, transaction);
-    } else {
-      // These two IDs are actually the same! But nothing should rely on that.
-      var thisID = this._rootNodeID;
-      var currentComponentID = currentComponent._rootNodeID;
-      currentComponent.unmountComponent();
-      var nextMarkup = nextComponent.mountComponent(thisID, transaction);
-      ReactComponent.DOMIDOperations.dangerouslyReplaceNodeWithMarkupByID(
-        currentComponentID,
-        nextMarkup
-      );
-      this._renderedComponent = nextComponent;
+  updateComponent: ReactPerf.measure(
+    'ReactCompositeComponent',
+    'updateComponent',
+    function(transaction, prevProps, prevState) {
+      ReactComponent.Mixin.updateComponent.call(this, transaction, prevProps);
+      var currentComponent = this._renderedComponent;
+      var nextComponent = this._renderValidatedComponent();
+      if (currentComponent.constructor === nextComponent.constructor) {
+        currentComponent.receiveProps(nextComponent.props, transaction);
+      } else {
+        // These two IDs are actually the same! But nothing should rely on that.
+        var thisID = this._rootNodeID;
+        var currentComponentID = currentComponent._rootNodeID;
+        currentComponent.unmountComponent();
+        this._renderedComponent = nextComponent;
+        var nextMarkup = nextComponent.mountComponent(
+          thisID,
+          transaction,
+          this._mountDepth + 1
+        );
+        ReactComponent.DOMIDOperations.dangerouslyReplaceNodeWithMarkupByID(
+          currentComponentID,
+          nextMarkup
+        );
+      }
     }
-  },
+  ),
 
   /**
    * Forces an update. This should only be invoked when it is known with
@@ -750,18 +801,10 @@ var ReactCompositeComponentMixin = {
    */
   forceUpdate: function(callback) {
     var compositeLifeCycleState = this._compositeLifeCycleState;
-    invariant(
-      this.isMounted() ||
-        compositeLifeCycleState === CompositeLifeCycle.MOUNTING,
-      'forceUpdate(...): Can only force an update on mounted or mounting ' +
-        'components.'
-    );
-    invariant(
-      compositeLifeCycleState !== CompositeLifeCycle.RECEIVING_STATE &&
-      compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING,
-      'forceUpdate(...): Cannot force an update while unmounting component ' +
-      'or during an existing state transition (such as within `render`).'
-    );
+    invariant(this.isMounted() ||
+      compositeLifeCycleState === CompositeLifeCycle.MOUNTING);
+    invariant(compositeLifeCycleState !== CompositeLifeCycle.RECEIVING_STATE &&
+    compositeLifeCycleState !== CompositeLifeCycle.UNMOUNTING);
     this._pendingForceUpdate = true;
     ReactUpdates.enqueueUpdate(this, callback);
   },
@@ -780,11 +823,7 @@ var ReactCompositeComponentMixin = {
     } finally {
       ReactCurrentOwner.current = null;
     }
-    invariant(
-      ReactComponent.isValidComponent(renderedComponent),
-      '%s.render(): A valid ReactComponent must be returned.',
-      this.constructor.displayName || 'ReactCompositeComponent'
-    );
+    invariant(ReactComponent.isValidComponent(renderedComponent));
     return renderedComponent;
   },
 
@@ -808,34 +847,13 @@ var ReactCompositeComponentMixin = {
    * @private
    */
   _bindAutoBindMethod: function(method) {
-    var component = this;
-    var boundMethod = function() {
-      return method.apply(component, arguments);
-    };
-    if (true) {
-      var componentName = component.constructor.displayName;
-      var _bind = boundMethod.bind;
-      boundMethod.bind = function(newThis) {
-        // User is trying to bind() an autobound method; we effectively will
-        // ignore the value of "this" that the user is trying to use, so
-        // let's warn.
-        if (newThis !== component) {
-          console.warn(
-            'bind(): React component methods may only be bound to the ' +
-            'component instance. See ' + componentName
-          );
-        } else if (arguments.length === 1) {
-          console.warn(
-            'bind(): You are binding a component method to the component. ' +
-            'React does this for you automatically in a high-performance ' +
-            'way, so you can safely remove this call. See ' + componentName
-          );
-          return boundMethod;
-        }
-        return _bind.apply(boundMethod, arguments);
+      var component = this;
+
+      var boundMethod = function() {
+        return method.apply(component, arguments);
       };
-    }
-    return boundMethod;
+
+      return boundMethod;
   }
 };
 
@@ -867,48 +885,41 @@ var ReactCompositeComponent = {
    * @public
    */
   createClass: function(spec) {
-    var Constructor = function() {};
-    Constructor.prototype = new ReactCompositeComponentBase();
-    Constructor.prototype.constructor = Constructor;
-    mixSpecIntoComponent(Constructor, spec);
-    invariant(
-      Constructor.prototype.render,
-      'createClass(...): Class specification must implement a `render` method.'
-    );
-    // Reduce time spent doing lookups by setting these on the prototype.
-    for (var methodName in ReactCompositeComponentInterface) {
-      if (!Constructor.prototype[methodName]) {
-        Constructor.prototype[methodName] = null;
-      }
-    }
+      var Constructor = function() {};
+      Constructor.prototype = new ReactCompositeComponentBase();
+      Constructor.prototype.constructor = Constructor;
+      mixSpecIntoComponent(Constructor, spec);
+      invariant(Constructor.prototype.render);
 
-    var ConvenienceConstructor = function(props, children) {
-      var instance = new Constructor();
-      instance.construct.apply(instance, arguments);
-      return instance;
-    };
-    ConvenienceConstructor.componentConstructor = Constructor;
-    ConvenienceConstructor.originalSpec = spec;
-    return ConvenienceConstructor;
+      // Reduce time spent doing lookups by setting these on the prototype.
+      for (var methodName in ReactCompositeComponentInterface) {
+        if (!Constructor.prototype[methodName]) {
+          Constructor.prototype[methodName] = null;
+        }
+      }
+
+      var ConvenienceConstructor = function(props, children) {
+        var instance = new Constructor();
+        instance.construct.apply(instance, arguments);
+        return instance;
+      };
+
+      ConvenienceConstructor.componentConstructor = Constructor;
+      ConvenienceConstructor.originalSpec = spec;
+      return ConvenienceConstructor;
   },
 
   /**
-   * TODO: Delete this when all callers have been updated to rely on this
-   * behavior being the default.
+   * Checks if a value is a valid component constructor.
    *
-   * Backwards compatible stub for what is now the default behavior.
-   * @param {function} method Method to be bound.
+   * @param {*}
+   * @return {boolean}
    * @public
    */
-  autoBind: function(method) {
-    if (true) {
-      console.warn(
-        'React.autoBind() is now deprecated. All React component methods ' +
-        'are auto bound by default, so React.autoBind() is a no-op. It ' +
-        'will be removed in the next version of React'
-      );
-    }
-    return method;
+  isValidClass: function(componentClass) {
+    return componentClass instanceof Function &&
+           'componentConstructor' in componentClass &&
+           componentClass.componentConstructor instanceof Function;
   }
 };
 

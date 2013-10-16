@@ -49,6 +49,8 @@ var INVALID_PROPERTY_ERRORS = {
  */
 var textContentAccessor = getTextContentAccessor() || 'NA';
 
+var LEADING_SPACE = /^ /;
+
 /**
  * Operations used to process updates to DOM nodes. This is made injectable via
  * `ReactComponent.DOMIDOperations`.
@@ -66,11 +68,7 @@ var ReactDOMIDOperations = {
    */
   updatePropertyByID: function(id, name, value) {
     var node = ReactMount.getNode(id);
-    invariant(
-      !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
-      'updatePropertyByID(...): %s',
-      INVALID_PROPERTY_ERRORS[name]
-    );
+    invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name));
 
     // If we're updating to null or undefined, we should remove the property
     // from the DOM node instead of inadvertantly setting to a string. This
@@ -92,11 +90,7 @@ var ReactDOMIDOperations = {
    */
   deletePropertyByID: function(id, name, value) {
     var node = ReactMount.getNode(id);
-    invariant(
-      !INVALID_PROPERTY_ERRORS.hasOwnProperty(name),
-      'updatePropertyByID(...): %s',
-      INVALID_PROPERTY_ERRORS[name]
-    );
+    invariant(!INVALID_PROPERTY_ERRORS.hasOwnProperty(name));
     DOMPropertyOperations.deleteValueForProperty(node, name, value);
   },
 
@@ -133,17 +127,17 @@ var ReactDOMIDOperations = {
   },
 
   /**
-   * Updates a DOM node's innerHTML set by `props.dangerouslySetInnerHTML`.
+   * Updates a DOM node's innerHTML.
    *
    * @param {string} id ID of the node to update.
-   * @param {object} html An HTML object with the `__html` property.
+   * @param {string} html An HTML string.
    * @internal
    */
   updateInnerHTMLByID: function(id, html) {
     var node = ReactMount.getNode(id);
     // HACK: IE8- normalize whitespace in innerHTML, removing leading spaces.
     // @see quirksmode.org/bugreports/archives/2004/11/innerhtml_and_t.html
-    node.innerHTML = (html && html.__html || '').replace(/^ /g, '&nbsp;');
+    node.innerHTML = html.replace(LEADING_SPACE, '&nbsp;');
   },
 
   /**
@@ -172,12 +166,17 @@ var ReactDOMIDOperations = {
   },
 
   /**
-   * TODO: We only actually *need* to purge the cache when we remove elements.
-   *       Detect if any elements were removed instead of blindly purging.
+   * Updates a component's children by processing a series of updates.
+   *
+   * @param {array<object>} updates List of update configurations.
+   * @param {array<string>} markup List of markup strings.
+   * @internal
    */
-  manageChildrenByParentID: function(parentID, domOperations) {
-    var parent = ReactMount.getNode(parentID);
-    DOMChildrenOperations.manageChildren(parent, domOperations);
+  dangerouslyProcessChildrenUpdates: function(updates, markup) {
+    for (var i = 0; i < updates.length; i++) {
+      updates[i].parentNode = ReactMount.getNode(updates[i].parentID);
+    }
+    DOMChildrenOperations.processUpdates(updates, markup);
   }
 
 };

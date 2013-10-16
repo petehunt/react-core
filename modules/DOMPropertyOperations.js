@@ -18,9 +18,7 @@
  */
 
 "use strict";
-
 var DOMProperty = require("./DOMProperty");
-
 var escapeTextForBrowser = require("./escapeTextForBrowser");
 var memoizeStringOnly = require("./memoizeStringOnly");
 
@@ -54,9 +52,8 @@ var DOMPropertyOperations = {
       }
       return processAttributeNameAndPrefix(name) +
         escapeTextForBrowser(value) + '"';
-    } else {
-      return null;
     }
+    return null;
   },
 
   /**
@@ -75,7 +72,7 @@ var DOMPropertyOperations = {
         if (DOMProperty.hasBooleanValue[name] && !value) {
           node.removeAttribute(DOMProperty.getAttributeName[name]);
         } else {
-          node.setAttribute(DOMProperty.getAttributeName[name], value);
+          node.setAttribute(DOMProperty.getAttributeName[name], '' + value);
         }
       } else {
         var propName = DOMProperty.getPropertyName[name];
@@ -84,7 +81,7 @@ var DOMPropertyOperations = {
         }
       }
     } else if (DOMProperty.isCustomAttribute(name)) {
-      node.setAttribute(name, value);
+      node.setAttribute(name, '' + value);
     }
   },
 

@@ -18,13 +18,14 @@
 
 "use strict";
 
+var LinkedValueMixin = require("./LinkedValueMixin");
 var ReactCompositeComponent = require("./ReactCompositeComponent");
 var ReactDOM = require("./ReactDOM");
 
 var invariant = require("./invariant");
 var merge = require("./merge");
 
-// Store a reference to the <select> `ReactNativeComponent`.
+// Store a reference to the <select> `ReactDOMComponent`.
 var select = ReactDOM.select;
 
 /**
@@ -36,19 +37,9 @@ function selectValueType(props, propName, componentName) {
     return;
   }
   if (props.multiple) {
-    invariant(
-      Array.isArray(props[propName]),
-      'The `%s` prop supplied to <select> must be an array if `multiple` is ' +
-      'true.',
-      propName
-    );
+    invariant(Array.isArray(props[propName]));
   } else {
-    invariant(
-      !Array.isArray(props[propName]),
-      'The `%s` prop supplied to <select> must be a scalar value if ' +
-      '`multiple` is false.',
-      propName
-    );
+    invariant(!Array.isArray(props[propName]));
   }
 }
 
@@ -58,11 +49,10 @@ function selectValueType(props, propName, componentName) {
  */
 function updateOptions() {
   /*jshint validthis:true */
-  if (this.props.value == null) {
-    return;
-  }
+  var propValue = this.getValue();
+  var value = propValue != null ? propValue : this.state.value;
   var options = this.getDOMNode().options;
-  var selectedValue = '' + this.props.value;
+  var selectedValue = '' + value;
 
   for (var i = 0, l = options.length; i < l; i++) {
     var selected = this.props.multiple ?
@@ -91,6 +81,7 @@ function updateOptions() {
  * selected.
  */
 var ReactDOMSelect = ReactCompositeComponent.createClass({
+  mixins: [LinkedValueMixin],
 
   propTypes: {
     defaultValue: selectValueType,
@@ -118,7 +109,7 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
     // Clone `this.props` so we don't mutate the input.
     var props = merge(this.props);
 
-    props.onChange = this.handleChange;
+    props.onChange = this._handleChange;
     props.value = null;
 
     return select(props, this.props.children);
@@ -128,11 +119,12 @@ var ReactDOMSelect = ReactCompositeComponent.createClass({
 
   componentDidUpdate: updateOptions,
 
-  handleChange: function(event) {
+  _handleChange: function(event) {
     var returnValue;
-    if (this.props.onChange) {
+    var onChange = this.getOnChange();
+    if (onChange) {
       this._isChanging = true;
-      returnValue = this.props.onChange(event);
+      returnValue = onChange(event);
       this._isChanging = false;
     }
 

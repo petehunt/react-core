@@ -21,7 +21,6 @@
 
 var EventConstants = require("./EventConstants");
 var EventPropagators = require("./EventPropagators");
-var ExecutionEnvironment = require("./ExecutionEnvironment");
 var SyntheticMouseEvent = require("./SyntheticMouseEvent");
 
 var ReactMount = require("./ReactMount");
@@ -34,6 +33,8 @@ var eventTypes = {
   mouseEnter: {registrationName: keyOf({onMouseEnter: null})},
   mouseLeave: {registrationName: keyOf({onMouseLeave: null})}
 };
+
+var extractedEvents = [null, null];
 
 var EnterLeaveEventPlugin = {
 
@@ -73,9 +74,9 @@ var EnterLeaveEventPlugin = {
       from = topLevelTarget;
       to =
         getFirstReactDOM(nativeEvent.relatedTarget || nativeEvent.toElement) ||
-        ExecutionEnvironment.global;
+        window;
     } else {
-      from = ExecutionEnvironment.global;
+      from = window;
       to = topLevelTarget;
     }
 
@@ -99,7 +100,11 @@ var EnterLeaveEventPlugin = {
     );
 
     EventPropagators.accumulateEnterLeaveDispatches(leave, enter, fromID, toID);
-    return [leave, enter];
+
+    extractedEvents[0] = leave;
+    extractedEvents[1] = enter;
+
+    return extractedEvents;
   }
 
 };

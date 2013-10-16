@@ -16,34 +16,16 @@
  * @providesModule ReactComponent
  */
 
-/*jslint evil: true */
-
 "use strict";
 
-var getReactRootElementInContainer = require("./getReactRootElementInContainer");
+var ReactComponentEnvironment = require("./ReactComponentEnvironment");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
-var ReactDOMIDOperations = require("./ReactDOMIDOperations");
-var ReactMarkupChecksum = require("./ReactMarkupChecksum");
-var ReactMount = require("./ReactMount");
 var ReactOwner = require("./ReactOwner");
-var ReactReconcileTransaction = require("./ReactReconcileTransaction");
 var ReactUpdates = require("./ReactUpdates");
 
 var invariant = require("./invariant");
 var keyMirror = require("./keyMirror");
 var merge = require("./merge");
-
-/**
- * Prop key that references a component's owner.
- * @private
- */
-var OWNER = '{owner}';
-
-/**
- * Props key that determines if a component's key was already validated.
- * @private
- */
-var IS_KEY_VALIDATED = '{is.key.validated}';
 
 /**
  * Every React component is in one of these life cycles.
@@ -77,10 +59,10 @@ var ownerHasWarned = {};
  * @param {ReactComponent} component Component that requires a key.
  */
 function validateExplicitKey(component) {
-  if (component[IS_KEY_VALIDATED] || component.props.key != null) {
+  if (component.__keyValidated__ || component.props.key != null) {
     return;
   }
-  component[IS_KEY_VALIDATED] = true;
+  component.__keyValidated__ = true;
 
   // We can't provide friendly warnings for top level components.
   if (!ReactCurrentOwner.current) {
@@ -99,7 +81,8 @@ function validateExplicitKey(component) {
   if (!component.isOwnedBy(ReactCurrentOwner.current)) {
     // Name of the component that originally created this child.
     var childOwnerName =
-      component.props[OWNER] && component.props[OWNER].constructor.displayName;
+      component.props.__owner__ &&
+      component.props.__owner__.constructor.displayName;
 
     // Usually the current owner is the offender, but if it accepts
     // children as a property, it may be the creator of the child that's
@@ -128,7 +111,7 @@ function validateChildKeys(component) {
     }
   } else if (ReactComponent.isValidComponent(component)) {
     // This component was passed in a valid location.
-    component[IS_KEY_VALIDATED] = true;
+    component.__keyValidated__ = true;
   }
 }
 
@@ -183,10 +166,10 @@ var ReactComponent = {
   getKey: function(component, index) {
     if (component && component.props && component.props.key != null) {
       // Explicit key
-      return '' + component.props.key;
+      return '{' + component.props.key + '}';
     }
     // Implicit key determined by the index in the set
-    return '' + index;
+    return '[' + index + ']';
   },
 
   /**
@@ -195,12 +178,33 @@ var ReactComponent = {
   LifeCycle: ComponentLifeCycle,
 
   /**
-   * React references `ReactDOMIDOperations` using this property in order to
-   * allow dependency injection.
+   * Injected module that provides ability to mutate individual properties.
+   * Injected into the base class because many different subclasses need access
+   * to this.
    *
    * @internal
    */
-  DOMIDOperations: ReactDOMIDOperations,
+  DOMIDOperations: ReactComponentEnvironment.DOMIDOperations,
+
+  /**
+   * Optionally injectable environment dependent cleanup hook. (server vs.
+   * browser etc). Example: A browser system caches DOM nodes based on component
+   * ID and must remove that cache entry when this instance is unmounted.
+   *
+   * @private
+   */
+  unmountIDFromEnvironment: ReactComponentEnvironment.unmountIDFromEnvironment,
+
+  /**
+   * The "image" of a component tree, is the platform specific (typically
+   * serialized) data that represents a tree of lower level UI building blocks.
+   * On the web, this "image" is HTML markup which describes a construction of
+   * low level `div` and `span` nodes. Other platforms may have different
+   * encoding of this "image". This must be injected.
+   *
+   * @private
+   */
+  mountImageIntoNode: ReactComponentEnvironment.mountImageIntoNode,
 
   /**
    * React references `ReactReconcileTransaction` using this property in order
@@ -208,30 +212,16 @@ var ReactComponent = {
    *
    * @internal
    */
-  ReactReconcileTransaction: ReactReconcileTransaction,
+  ReactReconcileTransaction:
+    ReactComponentEnvironment.ReactReconcileTransaction,
 
   /**
-   * @param {object} DOMIDOperations
-   * @final
-   */
-  setDOMOperations: function(DOMIDOperations) {
-    ReactComponent.DOMIDOperations = DOMIDOperations;
-  },
-
-  /**
-   * @param {Transaction} ReactReconcileTransaction
-   * @final
-   */
-  setReactReconcileTransaction: function(ReactReconcileTransaction) {
-    ReactComponent.ReactReconcileTransaction = ReactReconcileTransaction;
-  },
-
-  /**
-   * Base functionality for every ReactComponent constructor.
+   * Base functionality for every ReactComponent constructor. Mixed into the
+   * `ReactComponent` prototype, but exposed statically for easy access.
    *
    * @lends {ReactComponent.prototype}
    */
-  Mixin: {
+  Mixin: merge(ReactComponentEnvironment.Mixin, {
 
     /**
      * Checks whether or not this component is mounted.
@@ -242,21 +232,6 @@ var ReactComponent = {
      */
     isMounted: function() {
       return this._lifeCycleState === ComponentLifeCycle.MOUNTED;
-    },
-
-    /**
-     * Returns the DOM node rendered by this component.
-     *
-     * @return {DOMElement} The root node of this component.
-     * @final
-     * @protected
-     */
-    getDOMNode: function() {
-      invariant(
-        this.isMounted(),
-        'getDOMNode(): A component must be mounted to have a DOM node.'
-      );
-      return ReactMount.getNode(this._rootNodeID);
     },
 
     /**
@@ -284,14 +259,8 @@ var ReactComponent = {
      * @public
      */
     replaceProps: function(props, callback) {
-      invariant(
-        !this.props[OWNER],
-        'replaceProps(...): You called `setProps` or `replaceProps` on a ' +
-        'component with an owner. This is an anti-pattern since props will ' +
-        'get reactively updated when rendered. Instead, change the owner\'s ' +
-        '`render` method to pass the correct value as props to the component ' +
-        'where it is created.'
-      );
+      invariant(!this.props.__owner__);
+      invariant(this.isMounted());
       this._pendingProps = props;
       ReactUpdates.enqueueUpdate(this, callback);
     },
@@ -309,7 +278,7 @@ var ReactComponent = {
     construct: function(initialProps, children) {
       this.props = initialProps || {};
       // Record the component responsible for creating this component.
-      this.props[OWNER] = ReactCurrentOwner.current;
+      this.props.__owner__ = ReactCurrentOwner.current;
       // All components start unmounted.
       this._lifeCycleState = ComponentLifeCycle.UNMOUNTED;
 
@@ -319,17 +288,11 @@ var ReactComponent = {
       // Children can be more than one argument
       var childrenLength = arguments.length - 1;
       if (childrenLength === 1) {
-        if (true) {
-          validateChildKeys(children);
-        }
-        this.props.children = children;
+          this.props.children = children;
       } else if (childrenLength > 1) {
         var childArray = Array(childrenLength);
         for (var i = 0; i < childrenLength; i++) {
-          if (true) {
-            validateChildKeys(arguments[i + 1]);
-          }
-          childArray[i] = arguments[i + 1];
+            childArray[i] = arguments[i + 1];
         }
         this.props.children = childArray;
       }
@@ -345,21 +308,19 @@ var ReactComponent = {
      *
      * @param {string} rootID DOM ID of the root node.
      * @param {ReactReconcileTransaction} transaction
+     * @param {number} mountDepth number of components in the owner hierarchy.
      * @return {?string} Rendered markup to be inserted into the DOM.
      * @internal
      */
-    mountComponent: function(rootID, transaction) {
-      invariant(
-        !this.isMounted(),
-        'mountComponent(%s, ...): Can only mount an unmounted component.',
-        rootID
-      );
+    mountComponent: function(rootID, transaction, mountDepth) {
+      invariant(!this.isMounted());
       var props = this.props;
       if (props.ref != null) {
-        ReactOwner.addComponentAsRefTo(this, props.ref, props[OWNER]);
+        ReactOwner.addComponentAsRefTo(this, props.ref, props.__owner__);
       }
       this._rootNodeID = rootID;
       this._lifeCycleState = ComponentLifeCycle.MOUNTED;
+      this._mountDepth = mountDepth;
       // Effectively: return '';
     },
 
@@ -374,15 +335,12 @@ var ReactComponent = {
      * @internal
      */
     unmountComponent: function() {
-      invariant(
-        this.isMounted(),
-        'unmountComponent(): Can only unmount a mounted component.'
-      );
+      invariant(this.isMounted());
       var props = this.props;
       if (props.ref != null) {
-        ReactOwner.removeComponentAsRefFrom(this, props.ref, props[OWNER]);
+        ReactOwner.removeComponentAsRefFrom(this, props.ref, props.__owner__);
       }
-      ReactMount.purgeID(this._rootNodeID);
+      ReactComponent.unmountIDFromEnvironment(this._rootNodeID);
       this._rootNodeID = null;
       this._lifeCycleState = ComponentLifeCycle.UNMOUNTED;
     },
@@ -398,10 +356,7 @@ var ReactComponent = {
      * @internal
      */
     receiveProps: function(nextProps, transaction) {
-      invariant(
-        this.isMounted(),
-        'receiveProps(...): Can only update a mounted component.'
-      );
+      invariant(this.isMounted());
       this._pendingProps = nextProps;
       this._performUpdateIfNecessary(transaction);
     },
@@ -446,15 +401,16 @@ var ReactComponent = {
       // If either the owner or a `ref` has changed, make sure the newest owner
       // has stored a reference to `this`, and the previous owner (if different)
       // has forgotten the reference to `this`.
-      if (props[OWNER] !== prevProps[OWNER] || props.ref !== prevProps.ref) {
+      if (props.__owner__ !== prevProps.__owner__ ||
+          props.ref !== prevProps.ref) {
         if (prevProps.ref != null) {
           ReactOwner.removeComponentAsRefFrom(
-            this, prevProps.ref, prevProps[OWNER]
+            this, prevProps.ref, prevProps.__owner__
           );
         }
         // Correct, even if the owner is the same, and only the ref has changed.
         if (props.ref != null) {
-          ReactOwner.addComponentAsRefTo(this, props.ref, props[OWNER]);
+          ReactOwner.addComponentAsRefTo(this, props.ref, props.__owner__);
         }
       }
     },
@@ -495,63 +451,8 @@ var ReactComponent = {
         container,
         transaction,
         shouldReuseMarkup) {
-      invariant(
-        container && container.nodeType === 1,
-        'mountComponentIntoNode(...): Target container is not a DOM element.'
-      );
-      var markup = this.mountComponent(rootID, transaction);
-
-      if (shouldReuseMarkup) {
-        if (ReactMarkupChecksum.canReuseMarkup(
-              markup,
-              getReactRootElementInContainer(container))) {
-          return;
-        } else {
-          if (true) {
-            console.warn(
-              'React attempted to use reuse markup in a container but the ' +
-              'checksum was invalid. This generally means that you are using ' +
-              'server rendering and the markup generated on the server was ' +
-              'not what the client was expecting. React injected new markup ' +
-              'to compensate which works but you have lost many of the ' +
-              'benefits of server rendering. Instead, figure out why the ' +
-              'markup being generated is different on the client or server.'
-            );
-          }
-        }
-      }
-
-      // Asynchronously inject markup by ensuring that the container is not in
-      // the document when settings its `innerHTML`.
-      var parent = container.parentNode;
-      if (parent) {
-        var next = container.nextSibling;
-        parent.removeChild(container);
-        container.innerHTML = markup;
-        if (next) {
-          parent.insertBefore(container, next);
-        } else {
-          parent.appendChild(container);
-        }
-      } else {
-        container.innerHTML = markup;
-      }
-    },
-
-    /**
-     * Unmounts this component and removes it from the DOM.
-     *
-     * @param {DOMElement} container DOM element to unmount from.
-     * @final
-     * @internal
-     * @see {ReactMount.unmountAndReleaseReactRootNode}
-     */
-    unmountComponentFromNode: function(container) {
-      this.unmountComponent();
-      // http://jsperf.com/emptying-a-node
-      while (container.lastChild) {
-        container.removeChild(container.lastChild);
-      }
+      var markup = this.mountComponent(rootID, transaction, 0);
+      ReactComponent.mountImageIntoNode(markup, container, shouldReuseMarkup);
     },
 
     /**
@@ -563,7 +464,7 @@ var ReactComponent = {
      * @internal
      */
     isOwnedBy: function(owner) {
-      return this.props[OWNER] === owner;
+      return this.props.__owner__ === owner;
     },
 
     /**
@@ -575,15 +476,13 @@ var ReactComponent = {
      * @internal
      */
     getSiblingByRef: function(ref) {
-      var owner = this.props[OWNER];
+      var owner = this.props.__owner__;
       if (!owner || !owner.refs) {
         return null;
       }
       return owner.refs[ref];
     }
-
-  }
-
+  })
 };
 
 module.exports = ReactComponent;

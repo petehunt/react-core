@@ -174,11 +174,7 @@ var EventPluginHub = {
     var processingEventQueue = eventQueue;
     eventQueue = null;
     forEachAccumulated(processingEventQueue, executeDispatchesAndRelease);
-    invariant(
-      !eventQueue,
-      'processEventQueue(): Additional events were enqueued while processing ' +
-      'an event queue. Support for this has not yet been implemented.'
-    );
+    invariant(!eventQueue);
   }
 
 };
