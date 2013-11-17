@@ -40,18 +40,22 @@
  * @returns object
  */
 function createObjectFrom(keys, values /* = true */) {
-    var object = {};
-    var isArray = Array.isArray(values);
-
-    if (typeof values == 'undefined') {
-      values = true;
+  if (false) {
+    if (!Array.isArray(keys)) {
+      throw new TypeError('Must pass an array of keys.');
     }
+  }
 
-    for (var ii = keys.length; ii--;) {
-      object[keys[ii]] = isArray ? values[ii] : values;
-    }
+  var object = {};
+  var isArray = Array.isArray(values);
+  if (typeof values == 'undefined') {
+    values = true;
+  }
 
-    return object;
+  for (var ii = keys.length; ii--;) {
+    object[keys[ii]] = isArray ? values[ii] : values;
+  }
+  return object;
 }
 
 module.exports = createObjectFrom;

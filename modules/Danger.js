@@ -118,6 +118,11 @@ var Danger = {
           // we're done.
           resultListAssignmentCount += 1;
 
+        } else if (false) {
+          console.error(
+            "Danger: Discarding unexpected node:",
+            renderNode
+          );
         }
       }
     }

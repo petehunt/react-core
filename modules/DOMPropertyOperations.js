@@ -18,13 +18,48 @@
  */
 
 "use strict";
+
 var DOMProperty = require("./DOMProperty");
+
 var escapeTextForBrowser = require("./escapeTextForBrowser");
 var memoizeStringOnly = require("./memoizeStringOnly");
 
 var processAttributeNameAndPrefix = memoizeStringOnly(function(name) {
   return escapeTextForBrowser(name) + '="';
 });
+
+if (false) {
+  var reactProps = {
+    __owner__: true,
+    children: true,
+    dangerouslySetInnerHTML: true,
+    key: true,
+    ref: true
+  };
+  var warnedProperties = {};
+
+  var warnUnknownProperty = function(name) {
+    if (reactProps[name] || warnedProperties[name]) {
+      return;
+    }
+
+    warnedProperties[name] = true;
+    var lowerCasedName = name.toLowerCase();
+
+    // data-* attributes should be lowercase; suggest the lowercase version
+    var standardName = DOMProperty.isCustomAttribute(lowerCasedName) ?
+      lowerCasedName : DOMProperty.getPossibleStandardName[lowerCasedName];
+
+    // For now, only warn when we have a suggested correction. This prevents
+    // logging too much when using transferPropsTo.
+    if (standardName != null) {
+      console.warn(
+        'Unknown DOM property ' + name + '. Did you mean ' + standardName + '?'
+      );
+    }
+
+  };
+}
 
 /**
  * Operations for dealing with DOM properties.
@@ -52,6 +87,8 @@ var DOMPropertyOperations = {
       }
       return processAttributeNameAndPrefix(name) +
         escapeTextForBrowser(value) + '"';
+    } else if (false) {
+      warnUnknownProperty(name);
     }
     return null;
   },
@@ -82,6 +119,8 @@ var DOMPropertyOperations = {
       }
     } else if (DOMProperty.isCustomAttribute(name)) {
       node.setAttribute(name, '' + value);
+    } else if (false) {
+      warnUnknownProperty(name);
     }
   },
 
@@ -107,6 +146,8 @@ var DOMPropertyOperations = {
       }
     } else if (DOMProperty.isCustomAttribute(name)) {
       node.removeAttribute(name);
+    } else if (false) {
+      warnUnknownProperty(name);
     }
   }
 

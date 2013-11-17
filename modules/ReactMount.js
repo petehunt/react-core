@@ -17,15 +17,21 @@
  */
 
 "use strict";
+
 var ReactEventEmitter = require("./ReactEventEmitter");
 var ReactInstanceHandles = require("./ReactInstanceHandles");
+
 var $ = require("./$");
+var containsNode = require("./containsNode");
 var getReactRootElementInContainer = require("./getReactRootElementInContainer");
 var invariant = require("./invariant");
-var nodeContains = require("./nodeContains");
+var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
+
 var SEPARATOR = ReactInstanceHandles.SEPARATOR;
+
 var ATTR_NAME = 'data-reactid';
 var nodeCache = {};
+
 var ELEMENT_NODE_TYPE = 1;
 var DOC_NODE_TYPE = 9;
 
@@ -34,6 +40,11 @@ var instancesByReactRootID = {};
 
 /** Mapping from reactRootID to `container` nodes. */
 var containersByReactRootID = {};
+
+if (false) {
+  /** __DEV__-only mapping from reactRootID to root elements. */
+  var rootElementsByReactRootID = {};
+}
 
 /**
  * @param {DOMElement} container DOM element that may contain a React component.
@@ -123,7 +134,7 @@ function isValid(node, id) {
     invariant(internalGetID(node) === id);
 
     var container = ReactMount.findReactContainerForID(id);
-    if (container && nodeContains(container, node)) {
+    if (container && containsNode(container, node)) {
       return true;
     }
   }
@@ -215,13 +226,18 @@ var ReactMount = {
       nextComponent,
       container,
       callback) {
-      var nextProps = nextComponent.props;
+    var nextProps = nextComponent.props;
+    ReactMount.scrollMonitor(container, function() {
+      prevComponent.replaceProps(nextProps, callback);
+    });
 
-      ReactMount.scrollMonitor(container, function() {
-        prevComponent.replaceProps(nextProps, callback);
-      });
+    if (false) {
+      // Record the root element in case it later gets transplanted.
+      rootElementsByReactRootID[getReactRootID(container)] =
+        getReactRootElementInContainer(container);
+    }
 
-      return prevComponent;
+    return prevComponent;
   },
 
   /**
@@ -249,15 +265,20 @@ var ReactMount = {
       nextComponent,
       container,
       shouldReuseMarkup) {
-      var reactRootID = ReactMount._registerComponent(nextComponent, container);
+    var reactRootID = ReactMount._registerComponent(nextComponent, container);
+    nextComponent.mountComponentIntoNode(
+      reactRootID,
+      container,
+      shouldReuseMarkup
+    );
 
-      nextComponent.mountComponentIntoNode(
-        reactRootID,
-        container,
-        shouldReuseMarkup
-      );
+    if (false) {
+      // Record the root element in case it later gets transplanted.
+      rootElementsByReactRootID[reactRootID] =
+        getReactRootElementInContainer(container);
+    }
 
-      return nextComponent;
+    return nextComponent;
   },
 
   /**
@@ -273,12 +294,12 @@ var ReactMount = {
    * @return {ReactComponent} Component instance rendered in `container`.
    */
   renderComponent: function(nextComponent, container, callback) {
-    var registeredComponent = instancesByReactRootID[getReactRootID(container)];
+    var prevComponent = instancesByReactRootID[getReactRootID(container)];
 
-    if (registeredComponent) {
-      if (registeredComponent.constructor === nextComponent.constructor) {
+    if (prevComponent) {
+      if (shouldUpdateReactComponent(prevComponent, nextComponent)) {
         return ReactMount._updateRootComponent(
-          registeredComponent,
+          prevComponent,
           nextComponent,
           container,
           callback
@@ -292,7 +313,7 @@ var ReactMount = {
     var containerHasReactMarkup =
       reactRootElement && ReactMount.isRenderedByReact(reactRootElement);
 
-    var shouldReuseMarkup = containerHasReactMarkup && !registeredComponent;
+    var shouldReuseMarkup = containerHasReactMarkup && !prevComponent;
 
     var component = ReactMount._renderNewRootComponent(
       nextComponent,
@@ -359,24 +380,32 @@ var ReactMount = {
    *                   `container`
    */
   unmountComponentAtNode: function(container) {
-      var reactRootID = getReactRootID(container);
-      var component = instancesByReactRootID[reactRootID];
-
-      if (!component) {
-        return false;
-      }
-
-      ReactMount.unmountComponentFromNode(component, container);
-      delete instancesByReactRootID[reactRootID];
-      delete containersByReactRootID[reactRootID];
-      return true;
+    var reactRootID = getReactRootID(container);
+    var component = instancesByReactRootID[reactRootID];
+    if (!component) {
+      return false;
+    }
+    ReactMount.unmountComponentFromNode(component, container);
+    delete instancesByReactRootID[reactRootID];
+    delete containersByReactRootID[reactRootID];
+    if (false) {
+      delete rootElementsByReactRootID[reactRootID];
+    }
+    return true;
   },
 
   /**
    * @deprecated
    */
   unmountAndReleaseReactRootNode: function() {
-      return ReactMount.unmountComponentAtNode.apply(this, arguments);
+    if (false) {
+      console.warn(
+        'unmountAndReleaseReactRootNode() has been renamed to ' +
+        'unmountComponentAtNode() and will be removed in the next ' +
+        'version of React.'
+      );
+    }
+    return ReactMount.unmountComponentAtNode.apply(this, arguments);
   },
 
   /**
@@ -390,6 +419,10 @@ var ReactMount = {
    */
   unmountComponentFromNode: function(instance, container) {
     instance.unmountComponent();
+
+    if (container.nodeType === DOC_NODE_TYPE) {
+      container = container.documentElement;
+    }
 
     // http://jsperf.com/emptying-a-node
     while (container.lastChild) {
@@ -405,9 +438,34 @@ var ReactMount = {
    * @return {?DOMElement} DOM element that contains the `id`.
    */
   findReactContainerForID: function(id) {
-      var reactRootID = ReactInstanceHandles.getReactRootIDFromNodeID(id);
-      var container = containersByReactRootID[reactRootID];
-      return container;
+    var reactRootID = ReactInstanceHandles.getReactRootIDFromNodeID(id);
+    var container = containersByReactRootID[reactRootID];
+
+    if (false) {
+      var rootElement = rootElementsByReactRootID[reactRootID];
+      if (rootElement && rootElement.parentNode !== container) {
+        invariant(// Call internalGetID here because getID calls isValid which calls
+        // findReactContainerForID (this function).
+        internalGetID(rootElement) === reactRootID);
+
+        var containerChild = container.firstChild;
+        if (containerChild &&
+            reactRootID === internalGetID(containerChild)) {
+          // If the container has a new child with the same ID as the old
+          // root element, then rootElementsByReactRootID[reactRootID] is
+          // just stale and needs to be updated. The case that deserves a
+          // warning is when the container is empty.
+          rootElementsByReactRootID[reactRootID] = containerChild;
+        } else {
+          console.warn(
+            'ReactMount: Root element has been removed from its original ' +
+            'container. New container:', rootElement.parentNode
+          );
+        }
+      }
+    }
+
+    return container;
   },
 
   /**
@@ -466,43 +524,50 @@ var ReactMount = {
    * @internal
    */
   findComponentRoot: function(ancestorNode, id) {
-      var firstChildren = [ancestorNode.firstChild];
-      var childIndex = 0;
+    var firstChildren = [ancestorNode.firstChild];
+    var childIndex = 0;
 
-      while (childIndex < firstChildren.length) {
-        var child = firstChildren[childIndex++];
-        while (child) {
-          var childID = ReactMount.getID(child);
-          if (childID) {
-            if (id === childID) {
-              return child;
-            } else if (ReactInstanceHandles.isAncestorIDOf(childID, id)) {
-              // If we find a child whose ID is an ancestor of the given ID,
-              // then we can be sure that we only want to search the subtree
-              // rooted at this child, so we can throw out the rest of the
-              // search state.
-              firstChildren.length = childIndex = 0;
-              firstChildren.push(child.firstChild);
-              break;
-            } else {
-              // TODO This should not be necessary if the ID hierarchy is
-              // correct, but is occasionally necessary if the DOM has been
-              // modified in unexpected ways.
-              firstChildren.push(child.firstChild);
-            }
+    while (childIndex < firstChildren.length) {
+      var child = firstChildren[childIndex++];
+      while (child) {
+        var childID = ReactMount.getID(child);
+        if (childID) {
+          if (id === childID) {
+            return child;
+          } else if (ReactInstanceHandles.isAncestorIDOf(childID, id)) {
+            // If we find a child whose ID is an ancestor of the given ID,
+            // then we can be sure that we only want to search the subtree
+            // rooted at this child, so we can throw out the rest of the
+            // search state.
+            firstChildren.length = childIndex = 0;
+            firstChildren.push(child.firstChild);
+            break;
           } else {
-            // If this child had no ID, then there's a chance that it was
-            // injected automatically by the browser, as when a `<table>`
-            // element sprouts an extra `<tbody>` child as a side effect of
-            // `.innerHTML` parsing. Optimistically continue down this
-            // branch, but not before examining the other siblings.
+            // TODO This should not be necessary if the ID hierarchy is
+            // correct, but is occasionally necessary if the DOM has been
+            // modified in unexpected ways.
             firstChildren.push(child.firstChild);
           }
-          child = child.nextSibling;
+        } else {
+          // If this child had no ID, then there's a chance that it was
+          // injected automatically by the browser, as when a `<table>`
+          // element sprouts an extra `<tbody>` child as a side effect of
+          // `.innerHTML` parsing. Optimistically continue down this
+          // branch, but not before examining the other siblings.
+          firstChildren.push(child.firstChild);
         }
+        child = child.nextSibling;
       }
+    }
 
-      invariant(false);
+    if (false) {
+      console.error(
+        'Error while invoking `findComponentRoot` with the following ' +
+        'ancestor node:',
+        ancestorNode
+      );
+    }
+    invariant(false);
   },
 
 
@@ -511,6 +576,8 @@ var ReactMount = {
    */
 
   ATTR_NAME: ATTR_NAME,
+
+  getReactRootID: getReactRootID,
 
   getID: getID,
 

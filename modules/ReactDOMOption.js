@@ -31,7 +31,14 @@ var ReactDOMOption = ReactCompositeComponent.createClass({
 
   componentWillMount: function() {
     // TODO (yungsters): Remove support for `selected` in <option>.
-    if (this.props.selected != null) {}
+    if (this.props.selected != null) {
+      if (false) {
+        console.warn(
+          'Use the `defaultValue` or `value` props on <select> instead of ' +
+          'setting `selected` on <option>.'
+        );
+      }
+    }
   },
 
   render: function() {

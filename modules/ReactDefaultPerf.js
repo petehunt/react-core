@@ -23,7 +23,7 @@ var performanceNow = require("./performanceNow");
 
 var ReactDefaultPerf = {};
 
-if (true) {
+if (false) {
   ReactDefaultPerf = {
     /**
      * Gets the stored information for a given object's function.

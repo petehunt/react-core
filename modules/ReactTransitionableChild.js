@@ -17,6 +17,7 @@
  */
 
 "use strict";
+
 var React = require("./React");
 var CSSCore = require("./CSSCore");
 var ReactTransitionEvents = require("./ReactTransitionEvents");
@@ -26,9 +27,20 @@ var ReactTransitionEvents = require("./ReactTransitionEvents");
 // their node will be stuck in the DOM forever, so we detect if an animation
 // does not start and if it doesn't, we just call the end listener immediately.
 var TICK = 17;
-
 var NO_EVENT_TIMEOUT = 5000;
+
 var noEventListener = null;
+
+if (false) {
+  noEventListener = function() {
+    console.warn(
+      'transition(): tried to perform an animation without ' +
+      'an animationend or transitionend event after timeout (' +
+      NO_EVENT_TIMEOUT + 'ms). You should either disable this ' +
+      'transition in JS or add a CSS animation/transition.'
+    );
+  };
+}
 
 /**
  * This component is simply responsible for watching when its single child
@@ -44,32 +56,41 @@ var ReactTransitionableChild = React.createClass({
    * - Cleaning up the css (unless noReset is true)
    */
   transition: function(animationType, noReset, finishCallback) {
-      var node = this.getDOMNode();
-      var className = this.props.name + '-' + animationType;
-      var activeClassName = className + '-active';
-      var noEventTimeout = null;
+    var node = this.getDOMNode();
+    var className = this.props.name + '-' + animationType;
+    var activeClassName = className + '-active';
+    var noEventTimeout = null;
 
-      var endListener = function() {
-          // If this gets invoked after the component is unmounted it's OK.
-          if (!noReset) {
-            // Usually this means you're about to remove the node if you want to
-            // leave it in its animated state.
-            CSSCore.removeClass(node, className);
-            CSSCore.removeClass(node, activeClassName);
-          }
+    var endListener = function() {
+      if (false) {
+        clearTimeout(noEventTimeout);
+      }
 
-          ReactTransitionEvents.removeEndEventListener(node, endListener);
+      // If this gets invoked after the component is unmounted it's OK.
+      if (!noReset) {
+        // Usually this means you're about to remove the node if you want to
+        // leave it in its animated state.
+        CSSCore.removeClass(node, className);
+        CSSCore.removeClass(node, activeClassName);
+      }
 
-          // Usually this optional callback is used for informing an owner of
-          // a leave animation and telling it to remove the child.
-          finishCallback && finishCallback();
-      };
+      ReactTransitionEvents.removeEndEventListener(node, endListener);
 
-      ReactTransitionEvents.addEndEventListener(node, endListener);
-      CSSCore.addClass(node, className);
+      // Usually this optional callback is used for informing an owner of
+      // a leave animation and telling it to remove the child.
+      finishCallback && finishCallback();
+    };
 
-      // Need to do this to actually trigger a transition.
-      this.queueClass(activeClassName);
+    ReactTransitionEvents.addEndEventListener(node, endListener);
+
+    CSSCore.addClass(node, className);
+
+    // Need to do this to actually trigger a transition.
+    this.queueClass(activeClassName);
+
+    if (false) {
+      noEventTimeout = setTimeout(noEventListener, NO_EVENT_TIMEOUT);
+    }
   },
 
   queueClass: function(className) {

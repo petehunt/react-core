@@ -33,3 +33,22 @@ function invariant(condition) {
 }
 
 module.exports = invariant;
+
+if (false) {
+  var invariantDev = function(condition, format, a, b, c, d, e, f) {
+    if (format === undefined) {
+      throw new Error('invariant requires an error message argument');
+    }
+
+    if (!condition) {
+      var args = [a, b, c, d, e, f];
+      var argIndex = 0;
+      throw new Error(
+        'Invariant Violation: ' +
+        format.replace(/%s/g, function() { return args[argIndex++]; })
+      );
+    }
+  };
+
+  module.exports = invariantDev;
+}

@@ -41,7 +41,19 @@ var ReactPerf = {
    * @return {function}
    */
   measure: function(objName, fnName, func) {
-      return func;
+    if (false) {
+      var measuredFunc = null;
+      return function() {
+        if (ReactPerf.enableMeasure) {
+          if (!measuredFunc) {
+            measuredFunc = ReactPerf.storedMeasure(objName, fnName, func);
+          }
+          return measuredFunc.apply(this, arguments);
+        }
+        return func.apply(this, arguments);
+      };
+    }
+    return func;
   },
 
   injection: {
@@ -53,6 +65,13 @@ var ReactPerf = {
     }
   }
 };
+
+if (false) {
+  var ExecutionEnvironment = require("./ExecutionEnvironment");
+  var URL = ExecutionEnvironment.canUseDOM ? window.location.href : '';
+  ReactPerf.enableMeasure = ReactPerf.enableMeasure ||
+    !!URL.match(/[?&]react_perf\b/);
+}
 
 /**
  * Simply passes through the measured function, without measuring it.

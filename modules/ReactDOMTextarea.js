@@ -52,14 +52,19 @@ var ReactDOMTextarea = ReactCompositeComponent.createClass({
     // TODO (yungsters): Remove support for children content in <textarea>.
     var children = this.props.children;
     if (children != null) {
-        invariant(defaultValue == null);
+      if (false) {
+        console.warn(
+          'Use the `defaultValue` or `value` props instead of setting ' +
+          'children on <textarea>.'
+        );
+      }
+      invariant(defaultValue == null);
+      if (Array.isArray(children)) {
+        invariant(children.length <= 1);
+        children = children[0];
+      }
 
-        if (Array.isArray(children)) {
-          invariant(children.length <= 1);
-          children = children[0];
-        }
-
-        defaultValue = '' + children;
+      defaultValue = '' + children;
     }
     if (defaultValue == null) {
       defaultValue = '';

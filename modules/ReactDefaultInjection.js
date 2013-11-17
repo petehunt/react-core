@@ -46,42 +46,44 @@ var ReactDefaultBatchingStrategy = require("./ReactDefaultBatchingStrategy");
 var ReactUpdates = require("./ReactUpdates");
 
 function inject() {
-    ReactEventEmitter.TopLevelCallbackCreator = ReactEventTopLevelCallback;
+  ReactEventEmitter.TopLevelCallbackCreator = ReactEventTopLevelCallback;
+  /**
+   * Inject module for resolving DOM hierarchy and plugin ordering.
+   */
+  EventPluginHub.injection.injectEventPluginOrder(DefaultEventPluginOrder);
+  EventPluginHub.injection.injectInstanceHandle(ReactInstanceHandles);
 
-    /**
-     * Inject module for resolving DOM hierarchy and plugin ordering.
-     */
-    EventPluginHub.injection.injectEventPluginOrder(DefaultEventPluginOrder);
+  /**
+   * Some important event plugins included by default (without having to require
+   * them).
+   */
+  EventPluginHub.injection.injectEventPluginsByName({
+    SimpleEventPlugin: SimpleEventPlugin,
+    EnterLeaveEventPlugin: EnterLeaveEventPlugin,
+    ChangeEventPlugin: ChangeEventPlugin,
+    CompositionEventPlugin: CompositionEventPlugin,
+    MobileSafariClickEventPlugin: MobileSafariClickEventPlugin,
+    SelectEventPlugin: SelectEventPlugin
+  });
 
-    EventPluginHub.injection.injectInstanceHandle(ReactInstanceHandles);
+  ReactDOM.injection.injectComponentClasses({
+    button: ReactDOMButton,
+    form: ReactDOMForm,
+    input: ReactDOMInput,
+    option: ReactDOMOption,
+    select: ReactDOMSelect,
+    textarea: ReactDOMTextarea
+  });
 
-    /**
-     * Some important event plugins included by default (without having to require
-     * them).
-     */
-    EventPluginHub.injection.injectEventPluginsByName({
-      SimpleEventPlugin: SimpleEventPlugin,
-      EnterLeaveEventPlugin: EnterLeaveEventPlugin,
-      ChangeEventPlugin: ChangeEventPlugin,
-      CompositionEventPlugin: CompositionEventPlugin,
-      MobileSafariClickEventPlugin: MobileSafariClickEventPlugin,
-      SelectEventPlugin: SelectEventPlugin
-    });
+  DOMProperty.injection.injectDOMPropertyConfig(DefaultDOMPropertyConfig);
 
-    ReactDOM.injection.injectComponentClasses({
-      button: ReactDOMButton,
-      form: ReactDOMForm,
-      input: ReactDOMInput,
-      option: ReactDOMOption,
-      select: ReactDOMSelect,
-      textarea: ReactDOMTextarea
-    });
+  if (false) {
+    ReactPerf.injection.injectMeasure(require("./ReactDefaultPerf").measure);
+  }
 
-    DOMProperty.injection.injectDOMPropertyConfig(DefaultDOMPropertyConfig);
-
-    ReactUpdates.injection.injectBatchingStrategy(
-      ReactDefaultBatchingStrategy
-    );
+  ReactUpdates.injection.injectBatchingStrategy(
+    ReactDefaultBatchingStrategy
+  );
 }
 
 module.exports = {

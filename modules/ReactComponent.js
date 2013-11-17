@@ -288,11 +288,17 @@ var ReactComponent = {
       // Children can be more than one argument
       var childrenLength = arguments.length - 1;
       if (childrenLength === 1) {
-          this.props.children = children;
+        if (false) {
+          validateChildKeys(children);
+        }
+        this.props.children = children;
       } else if (childrenLength > 1) {
         var childArray = Array(childrenLength);
         for (var i = 0; i < childrenLength; i++) {
-            childArray[i] = arguments[i + 1];
+          if (false) {
+            validateChildKeys(arguments[i + 1]);
+          }
+          childArray[i] = arguments[i + 1];
         }
         this.props.children = childArray;
       }

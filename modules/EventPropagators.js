@@ -37,7 +37,10 @@ var PropagationPhases = EventConstants.PropagationPhases;
 var injection = {
   InstanceHandle: null,
   injectInstanceHandle: function(InjectedInstanceHandle) {
-      injection.InstanceHandle = InjectedInstanceHandle;
+    injection.InstanceHandle = InjectedInstanceHandle;
+    if (false) {
+      injection.validate();
+    }
   },
   validate: function() {
     var invalid = !injection.InstanceHandle||
@@ -66,13 +69,18 @@ function listenerAtPhase(id, event, propagationPhase) {
  * "dispatch" object that pairs the event with the listener.
  */
 function accumulateDirectionalDispatches(domID, upwards, event) {
-    var phase = upwards ? PropagationPhases.bubbled : PropagationPhases.captured;
-    var listener = listenerAtPhase(domID, event, phase);
-
-    if (listener) {
-      event._dispatchListeners = accumulate(event._dispatchListeners, listener);
-      event._dispatchIDs = accumulate(event._dispatchIDs, domID);
+  if (false) {
+    if (!domID) {
+      throw new Error('Dispatching id must not be null');
     }
+    injection.validate();
+  }
+  var phase = upwards ? PropagationPhases.bubbled : PropagationPhases.captured;
+  var listener = listenerAtPhase(domID, event, phase);
+  if (listener) {
+    event._dispatchListeners = accumulate(event._dispatchListeners, listener);
+    event._dispatchIDs = accumulate(event._dispatchIDs, domID);
+  }
 }
 
 /**
@@ -121,22 +129,31 @@ function accumulateDirectDispatchesSingle(event) {
 }
 
 function accumulateTwoPhaseDispatches(events) {
-    forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
+  if (false) {
+    injection.validate();
+  }
+  forEachAccumulated(events, accumulateTwoPhaseDispatchesSingle);
 }
 
 function accumulateEnterLeaveDispatches(leave, enter, fromID, toID) {
-    injection.InstanceHandle.traverseEnterLeave(
-      fromID,
-      toID,
-      accumulateDispatches,
-      leave,
-      enter
-    );
+  if (false) {
+    injection.validate();
+  }
+  injection.InstanceHandle.traverseEnterLeave(
+    fromID,
+    toID,
+    accumulateDispatches,
+    leave,
+    enter
+  );
 }
 
 
 function accumulateDirectDispatches(events) {
-    forEachAccumulated(events, accumulateDirectDispatchesSingle);
+  if (false) {
+    injection.validate();
+  }
+  forEachAccumulated(events, accumulateDirectDispatchesSingle);
 }
 
 

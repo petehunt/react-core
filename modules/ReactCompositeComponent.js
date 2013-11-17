@@ -20,6 +20,7 @@
 
 var ReactComponent = require("./ReactComponent");
 var ReactCurrentOwner = require("./ReactCurrentOwner");
+var ReactErrorUtils = require("./ReactErrorUtils");
 var ReactOwner = require("./ReactOwner");
 var ReactPerf = require("./ReactPerf");
 var ReactPropTransferer = require("./ReactPropTransferer");
@@ -30,6 +31,7 @@ var keyMirror = require("./keyMirror");
 var merge = require("./merge");
 var mixInto = require("./mixInto");
 var objMap = require("./objMap");
+var shouldUpdateReactComponent = require("./shouldUpdateReactComponent");
 
 /**
  * Policies that describe methods in `ReactCompositeComponentInterface`.
@@ -94,7 +96,7 @@ var ReactCompositeComponentInterface = {
    * @type {object}
    * @optional
    */
-  propTypes: SpecPolicy.DEFINE_ONCE,
+  propTypes: SpecPolicy.DEFINE_MANY_MERGED,
 
 
 
@@ -641,7 +643,7 @@ var ReactCompositeComponentMixin = {
     var propName;
     var defaultProps = this._defaultProps;
     for (propName in defaultProps) {
-      if (!(propName in props)) {
+      if (typeof props[propName] === 'undefined') {
         props[propName] = defaultProps[propName];
       }
     }
@@ -729,7 +731,7 @@ var ReactCompositeComponentMixin = {
     var prevState = this.state;
 
     if (this.componentWillUpdate) {
-      this.componentWillUpdate(nextProps, nextState, transaction);
+      this.componentWillUpdate(nextProps, nextState);
     }
 
     this.props = nextProps;
@@ -762,15 +764,15 @@ var ReactCompositeComponentMixin = {
     'updateComponent',
     function(transaction, prevProps, prevState) {
       ReactComponent.Mixin.updateComponent.call(this, transaction, prevProps);
-      var currentComponent = this._renderedComponent;
+      var prevComponent = this._renderedComponent;
       var nextComponent = this._renderValidatedComponent();
-      if (currentComponent.constructor === nextComponent.constructor) {
-        currentComponent.receiveProps(nextComponent.props, transaction);
+      if (shouldUpdateReactComponent(prevComponent, nextComponent)) {
+        prevComponent.receiveProps(nextComponent.props, transaction);
       } else {
         // These two IDs are actually the same! But nothing should rely on that.
         var thisID = this._rootNodeID;
-        var currentComponentID = currentComponent._rootNodeID;
-        currentComponent.unmountComponent();
+        var prevComponentID = prevComponent._rootNodeID;
+        prevComponent.unmountComponent();
         this._renderedComponent = nextComponent;
         var nextMarkup = nextComponent.mountComponent(
           thisID,
@@ -778,7 +780,7 @@ var ReactCompositeComponentMixin = {
           this._mountDepth + 1
         );
         ReactComponent.DOMIDOperations.dangerouslyReplaceNodeWithMarkupByID(
-          currentComponentID,
+          prevComponentID,
           nextMarkup
         );
       }
@@ -836,7 +838,10 @@ var ReactCompositeComponentMixin = {
         continue;
       }
       var method = this.__reactAutoBindMap[autoBindKey];
-      this[autoBindKey] = this._bindAutoBindMethod(method);
+      this[autoBindKey] = this._bindAutoBindMethod(ReactErrorUtils.guard(
+        method,
+        this.constructor.displayName + '.' + autoBindKey
+      ));
     }
   },
 
@@ -847,13 +852,42 @@ var ReactCompositeComponentMixin = {
    * @private
    */
   _bindAutoBindMethod: function(method) {
-      var component = this;
-
-      var boundMethod = function() {
-        return method.apply(component, arguments);
+    var component = this;
+    var boundMethod = function() {
+      return method.apply(component, arguments);
+    };
+    if (false) {
+      boundMethod.__reactBoundContext = component;
+      boundMethod.__reactBoundMethod = method;
+      boundMethod.__reactBoundArguments = null;
+      var componentName = component.constructor.displayName;
+      var _bind = boundMethod.bind;
+      boundMethod.bind = function(newThis) {
+        // User is trying to bind() an autobound method; we effectively will
+        // ignore the value of "this" that the user is trying to use, so
+        // let's warn.
+        if (newThis !== component && newThis !== null) {
+          console.warn(
+            'bind(): React component methods may only be bound to the ' +
+            'component instance. See ' + componentName
+          );
+        } else if (arguments.length === 1) {
+          console.warn(
+            'bind(): You are binding a component method to the component. ' +
+            'React does this for you automatically in a high-performance ' +
+            'way, so you can safely remove this call. See ' + componentName
+          );
+          return boundMethod;
+        }
+        var reboundMethod = _bind.apply(boundMethod, arguments);
+        reboundMethod.__reactBoundContext = component;
+        reboundMethod.__reactBoundMethod = method;
+        reboundMethod.__reactBoundArguments =
+          Array.prototype.slice.call(arguments, 1);
+        return reboundMethod;
       };
-
-      return boundMethod;
+    }
+    return boundMethod;
   }
 };
 
@@ -885,28 +919,39 @@ var ReactCompositeComponent = {
    * @public
    */
   createClass: function(spec) {
-      var Constructor = function() {};
-      Constructor.prototype = new ReactCompositeComponentBase();
-      Constructor.prototype.constructor = Constructor;
-      mixSpecIntoComponent(Constructor, spec);
-      invariant(Constructor.prototype.render);
+    var Constructor = function() {};
+    Constructor.prototype = new ReactCompositeComponentBase();
+    Constructor.prototype.constructor = Constructor;
+    mixSpecIntoComponent(Constructor, spec);
 
-      // Reduce time spent doing lookups by setting these on the prototype.
-      for (var methodName in ReactCompositeComponentInterface) {
-        if (!Constructor.prototype[methodName]) {
-          Constructor.prototype[methodName] = null;
-        }
+    invariant(Constructor.prototype.render);
+
+    if (false) {
+      if (Constructor.prototype.componentShouldUpdate) {
+        console.warn(
+          (spec.displayName || 'A component') + ' has a method called ' +
+          'componentShouldUpdate(). Did you mean shouldComponentUpdate()? ' +
+          'The name is phrased as a question because the function is ' +
+          'expected to return a value.'
+         );
       }
+    }
 
-      var ConvenienceConstructor = function(props, children) {
-        var instance = new Constructor();
-        instance.construct.apply(instance, arguments);
-        return instance;
-      };
+    // Reduce time spent doing lookups by setting these on the prototype.
+    for (var methodName in ReactCompositeComponentInterface) {
+      if (!Constructor.prototype[methodName]) {
+        Constructor.prototype[methodName] = null;
+      }
+    }
 
-      ConvenienceConstructor.componentConstructor = Constructor;
-      ConvenienceConstructor.originalSpec = spec;
-      return ConvenienceConstructor;
+    var ConvenienceConstructor = function(props, children) {
+      var instance = new Constructor();
+      instance.construct.apply(instance, arguments);
+      return instance;
+    };
+    ConvenienceConstructor.componentConstructor = Constructor;
+    ConvenienceConstructor.originalSpec = spec;
+    return ConvenienceConstructor;
   },
 
   /**
