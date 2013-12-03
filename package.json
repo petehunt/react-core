@@ -1,11 +1,11 @@
 {
-  "name": "react-core",
-  "version": "0.6.0-alpha",
+  "name": "React",
+  "version": "0.5.1",
   "keywords": [
     "react"
   ],
-  "homepage": "https://github.com/facebook/react/tree/master/npm-react-core",
-  "bugs": "https://github.com/facebook/react/issues?labels=react-core",
+  "homepage": "http://facebook.github.io/react",
+  "bugs": "https://github.com/facebook/react/issues",
   "licenses": [
     {
       "type": "Apache-2.0",
@@ -13,25 +13,17 @@
     }
   ],
   "files": [
-    "README.md",
-    "addons.js",
-    "react.js",
-    "lib/"
+    "modules/"
   ],
-  "main": "react.js",
+  "main": "modules/ReactWithAddons.js",
   "repository": {
     "type": "git",
     "url": "https://github.com/facebook/react"
   },
+  "devDependencies": {
+    "react-tools": "0.5.1"
+  },
   "engines": {
     "node": ">=0.10.0"
-  },
-  "peerDependencies": {
-    "envify": "~0.2.0"
-  },
-  "browserify": {
-    "transform": [
-      "envify"
-    ]
   }
 }
